@@ -1,0 +1,1147 @@
+diff --git a/fbdoom/Makefile b/fbdoom/Makefile
+index fb32c7b..d31b52a 100644
+--- a/fbdoom/Makefile
++++ b/fbdoom/Makefile
+@@ -18,6 +18,7 @@ endif
+ #CFLAGS+=-fsanitize=address
+ OBJS+=$(OBJDIR)/i_video_fbdev.o
+ OBJS+=$(OBJDIR)/i_input_tty.o
++OBJS+=$(OBJDIR)/i_input_evdev_mouse.o
+ 
+ CC=$(CROSS_COMPILE)gcc  # gcc or g++
+ CFLAGS+=-ggdb3 -Os
+diff --git a/fbdoom/i_input_evdev_mouse.c b/fbdoom/i_input_evdev_mouse.c
+new file mode 100644
+index 0000000..0aa03ce
+--- /dev/null
++++ b/fbdoom/i_input_evdev_mouse.c
+@@ -0,0 +1,280 @@
++//
++// This program is free software; you can redistribute it and/or
++// modify it under the terms of the GNU General Public License
++// as published by the Free Software Foundation; either version 2
++// of the License, or (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++//
++// DESCRIPTION:
++//	DOOM mouse input via linux evdev
++//
++
++
++#include <errno.h>
++#include <fcntl.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++#include <unistd.h>
++#include <sys/ioctl.h>
++#include <linux/input.h>
++
++#include "doomtype.h"
++#include "d_event.h"
++#include "i_input_tty.h"
++#include "m_argv.h"
++
++#define MAX_MICE 4
++
++/* Movement that has been read but not posted yet is kept within this.  It
++ * is far more than a mouse sends between two tics, and it keeps the sums
++ * and the acceleration from overflowing whatever a device reports. */
++#define MOUSE_MAX 0x7fff
++
++/* An event as the kernel writes it: the time as two longs, then the type,
++ * the code and the value.  struct input_event from <linux/input.h> is not
++ * used for reading.  With a 64-bit time_t on a 32-bit system it is only
++ * the same size if the C library defines __USE_TIME_BITS64 before that
++ * header is read; if not, it is 24 bytes and the kernel writes 16. */
++struct kernel_input_event {
++    unsigned long sec;
++    unsigned long usec;
++    uint16_t type;
++    uint16_t code;
++    int32_t value;
++};
++
++_Static_assert(sizeof(struct kernel_input_event) == (sizeof(long) == 4 ? 16 : 24),
++               "struct kernel_input_event does not match the kernel");
++
++static struct mouse {
++    int fd;
++    int buttons;    /* bit 0 left, bit 1 right, bit 2 middle */
++    int have;       /* bytes of an unfinished event left by the last read */
++    unsigned char buf[16 * sizeof(struct kernel_input_event)];
++} mice[MAX_MICE];
++
++static int nmice = 0;
++static int novert = 0;
++static int mouse_dx = 0, mouse_dy = 0;  /* movement read, not posted yet */
++
++/* The kernel's bitmaps are arrays of unsigned long. */
++#define LONG_BITS       (8 * sizeof(unsigned long))
++#define BITMAP_LONGS(n) (((n) + LONG_BITS - 1) / LONG_BITS)
++
++static int test_bit(const unsigned long *map, int n)
++{
++    return (map[n / LONG_BITS] >> (n % LONG_BITS)) & 1;
++}
++
++/* A mouse reports relative X and Y and has a left button. */
++static int is_mouse(int fd)
++{
++    unsigned long ev[BITMAP_LONGS(EV_CNT)] = { 0 };
++    unsigned long rel[BITMAP_LONGS(REL_CNT)] = { 0 };
++    unsigned long key[BITMAP_LONGS(KEY_CNT)] = { 0 };
++
++    if (ioctl(fd, EVIOCGBIT(0, sizeof(ev)), ev) < 0
++        || !test_bit(ev, EV_REL) || !test_bit(ev, EV_KEY))
++        return 0;
++    if (ioctl(fd, EVIOCGBIT(EV_REL, sizeof(rel)), rel) < 0
++        || ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key)), key) < 0)
++        return 0;
++
++    return test_bit(rel, REL_X) && test_bit(rel, REL_Y) && test_bit(key, BTN_LEFT);
++}
++
++/* Start reading a mouse from an open, non-blocking descriptor. */
++static int mouse_add(int fd)
++{
++    if (nmice >= MAX_MICE)
++        return 0;
++
++    mice[nmice].fd = fd;
++    mice[nmice].buttons = 0;
++    mice[nmice].have = 0;
++    nmice++;
++    return 1;
++}
++
++/* The kernel dropped events, so a button change may be missing: ask
++ * which buttons are down now. */
++static void mouse_sync(struct mouse *m)
++{
++    unsigned long key[BITMAP_LONGS(KEY_CNT)] = { 0 };
++
++    m->buttons = 0;
++    if (ioctl(m->fd, EVIOCGKEY(sizeof(key)), key) >= 0)
++        m->buttons = test_bit(key, BTN_LEFT) | (test_bit(key, BTN_RIGHT) << 1)
++                   | (test_bit(key, BTN_MIDDLE) << 2);
++}
++
++/* Add to a movement total, staying within MOUSE_MAX either way. */
++static int mouse_move(int total, int value)
++{
++    if (value > MOUSE_MAX)
++        value = MOUSE_MAX;
++    else if (value < -MOUSE_MAX)
++        value = -MOUSE_MAX;
++
++    total += value;
++
++    if (total > MOUSE_MAX)
++        total = MOUSE_MAX;
++    else if (total < -MOUSE_MAX)
++        total = -MOUSE_MAX;
++
++    return total;
++}
++
++static void mouse_event(struct mouse *m, const struct kernel_input_event *ev)
++{
++    int bit;
++
++    if (ev->type == EV_REL) {
++        if (ev->code == REL_X)
++            mouse_dx = mouse_move(mouse_dx, ev->value);
++        else if (ev->code == REL_Y)
++            mouse_dy = mouse_move(mouse_dy, ev->value);
++    } else if (ev->type == EV_KEY) {
++        switch (ev->code) {
++            case BTN_LEFT:   bit = 1; break;
++            case BTN_RIGHT:  bit = 2; break;
++            case BTN_MIDDLE: bit = 4; break;
++            default: return;
++        }
++        if (ev->value)
++            m->buttons |= bit;
++        else
++            m->buttons &= ~bit;
++    } else if (ev->type == EV_SYN && ev->code == SYN_DROPPED) {
++        mouse_sync(m);
++    }
++}
++
++/* Read everything that is waiting on one mouse, without blocking.
++ * Returns 0 if the mouse has gone (unplugged, for example). */
++static int mouse_drain(struct mouse *m)
++{
++    struct kernel_input_event ev;
++    int n, off, room;
++
++    for (;;) {
++        room = sizeof(m->buf) - m->have;
++        n = read(m->fd, m->buf + m->have, room);
++        if (n < 0 && errno == EINTR)
++            continue;
++        if (n < 0 && errno == EAGAIN)
++            return 1;
++        if (n <= 0)
++            return 0;
++
++        /* Handle the whole events, and keep the start of an unfinished
++         * one for the next read. */
++        m->have += n;
++        for (off = 0; off + (int)sizeof(ev) <= m->have; off += sizeof(ev)) {
++            memcpy(&ev, m->buf + off, sizeof(ev));
++            mouse_event(m, &ev);
++        }
++        m->have -= off;
++        memmove(m->buf, m->buf + off, m->have);
++
++        /* A read that did not fill the buffer took all there was. */
++        if (n < room)
++            return 1;
++    }
++}
++
++/* Chocolate Doom's default mouse acceleration (threshold 10, factor 2) in
++ * integer maths: movement beyond 10 counts is doubled. */
++static int mouse_accel(int val)
++{
++    if (val > 10)
++        return (val - 10) * 2 + 10;
++    if (val < -10)
++        return (val + 10) * 2 - 10;
++
++    return val;
++}
++
++/* Read what is waiting on every mouse, and keep it for I_ReadMouse.  The
++ * kernel only holds a small number of events for each device (128 for an
++ * ordinary mouse) and throws away the lot when that fills up, so this is
++ * also called on either side of the blit in i_video_fbdev.c, which is the
++ * longest stretch with no call to I_GetEvent. */
++void I_PollMouse(void)
++{
++    int i;
++
++    for (i = 0; i < nmice; i++) {
++        if (!mouse_drain(&mice[i])) {
++            close(mice[i].fd);
++            mice[i] = mice[--nmice];
++            i--;
++        }
++    }
++}
++
++/* Called from I_GetEvent.  Posts at most one ev_mouse event, holding all
++ * the movement since the last one and the buttons as they are now. */
++void I_ReadMouse(void)
++{
++    static int last_buttons = 0;
++    int i, buttons = 0;
++    event_t event;
++
++    I_PollMouse();
++
++    for (i = 0; i < nmice; i++)
++        buttons |= mice[i].buttons;
++
++    if (mouse_dx == 0 && mouse_dy == 0 && buttons == last_buttons)
++        return;
++    last_buttons = buttons;
++
++    event.type = ev_mouse;
++    event.data1 = buttons;
++    event.data2 = mouse_accel(mouse_dx);
++    event.data3 = novert ? 0 : -mouse_accel(mouse_dy);
++    event.data4 = 0;
++    mouse_dx = mouse_dy = 0;
++    D_PostEvent(&event);
++}
++
++/* Find the mice among /dev/input/event0 to event31.  The use_mouse
++ * config variable is not looked at: -nomouse turns the mouse off. */
++void I_InitMouse(void)
++{
++    char path[32];
++    char name[64];
++    int i, fd;
++
++    novert = M_CheckParm("-novert") > 0;
++
++    if (M_CheckParm("-nomouse") > 0)
++        return;
++
++    for (i = 0; i < 32 && nmice < MAX_MICE; i++) {
++        snprintf(path, sizeof(path), "/dev/input/event%d", i);
++        fd = open(path, O_RDONLY | O_NONBLOCK);
++        if (fd < 0)
++            continue;
++        if (!is_mouse(fd)) {
++            close(fd);
++            continue;
++        }
++
++        memset(name, 0, sizeof(name));
++        if (ioctl(fd, EVIOCGNAME(sizeof(name) - 1), name) < 0)
++            strcpy(name, "?");
++        printf("Using mouse on %s (%s)\n", path, name);
++        mouse_add(fd);
++    }
++
++    if (nmice == 0)
++        printf("No mouse found.\n");
++}
+diff --git a/fbdoom/i_input_tty.c b/fbdoom/i_input_tty.c
+index 95e1b60..bf7c237 100644
+--- a/fbdoom/i_input_tty.c
++++ b/fbdoom/i_input_tty.c
+@@ -25,6 +25,7 @@
+ #include <fcntl.h>
+ #include <stdio.h>
+ #include <termios.h>
++#include <signal.h>
+ #include <sys/ioctl.h>
+ #include <linux/keyboard.h>
+ #include <linux/kd.h>
+@@ -33,6 +34,7 @@
+ #include "deh_str.h"
+ #include "doomtype.h"
+ #include "doomkeys.h"
++#include "i_input_tty.h"
+ #include "i_joystick.h"
+ #include "i_system.h"
+ #include "i_swap.h"
+@@ -153,10 +155,10 @@ static const char at_to_doom[] =
+     /* 0x5e */ 0x0,
+     /* 0x5f */ 0x0,
+     /* 0x60 */ 0x0,
+-    /* 0x61 */ 0x0,
++    /* 0x61 */ KEY_FIRE, /* Right Ctrl, the same as 0x1d */
+     /* 0x62 */ 0x0,
+     /* 0x63 */ 0x0,
+-    /* 0x64 */ 0x0,
++    /* 0x64 */ KEY_RALT, /* Right Alt, the same as 0x38 */
+     /* 0x65 */ 0x0,
+     /* 0x66 */ 0x0,
+     /* 0x67 */ KEY_UPARROW,
+@@ -254,6 +256,40 @@ int tty_is_kbd(int fd)
+ static int old_mode = -1;
+ static struct termios old_term;
+ static int kb = -1; /* keyboard file descriptor */
++static int old_kdmode = -1;
++
++/* Put the VT back: keyboard mode, termios and text mode. */
++void kbd_restore(void)
++{
++    if (old_mode != -1) {
++        ioctl(kb, KDSKBMODE, old_mode);
++        /* Drop the raw key bytes that were never read, or the shell
++           would get them as typed characters. */
++        tcflush(kb, TCIFLUSH);
++        tcsetattr(kb, TCSANOW, &old_term);
++        old_mode = -1;
++    }
++    if (old_kdmode != -1) {
++        ioctl(kb, KDSETMODE, old_kdmode);
++        old_kdmode = -1;
++    }
++}
++
++static void kbd_fatal(int sig)
++{
++    kbd_restore();
++    signal(sig, SIG_DFL);
++    raise(sig);
++}
++
++/* The signals that would otherwise end the program with the VT left as
++   it is, and a stack for kbd_fatal, so that it can still run when the
++   signal came from the stack running out. */
++static const int kbd_fatal_signals[] = {
++    SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT, SIGTERM, SIGHUP,
++    SIGINT, SIGQUIT, SIGPIPE, SIGALRM, SIGUSR1, SIGUSR2
++};
++static char kbd_fatal_stack[8192];
+ 
+ void kbd_shutdown(void)
+ {
+@@ -263,10 +299,7 @@ void kbd_shutdown(void)
+     fflush(stdout);
+ 
+     printf("Exiting normally.\n");
+-    if (old_mode != -1) {
+-        ioctl(kb, KDSKBMODE, old_mode);
+-        tcsetattr(kb, 0, &old_term);
+-    }
++    kbd_restore();
+ 
+     if (kb > 3)
+         close(kb);
+@@ -277,6 +310,8 @@ void kbd_shutdown(void)
+ static int kbd_init(void)
+ {
+     struct termios new_term;
++    struct sigaction sa;
++    stack_t ss;
+     char *files_to_try[] = {"/dev/tty", "/dev/tty0", "/dev/console", NULL};
+     int i;
+     int flags;
+@@ -319,20 +354,35 @@ static int kbd_init(void)
+         return 1;
+     }
+ 
+-    /* Find the keyboard's mode so we can restore it later. */
+-    if (ioctl(kb, KDGKBMODE, &old_mode) != 0) {
+-        printf("Unable to query keyboard mode.\n");
+-        kbd_shutdown();
+-    }
+-
+     /* Adjust the terminal's settings. In particular, disable
+        echoing, signal generation, and line buffering. Any of
+-       these could cause trouble. Save the old settings first. */
++       these could cause trouble. Save the old settings first.
++       This comes before the keyboard mode is saved: kbd_restore
++       takes a saved keyboard mode to mean that old_term is valid. */
+     if (tcgetattr(kb, &old_term) != 0) {
+         printf("Unable to query terminal settings.\n");
+         kbd_shutdown();
+     }
+ 
++    /* Find the keyboard's mode so we can restore it later. */
++    if (ioctl(kb, KDGKBMODE, &old_mode) != 0) {
++        printf("Unable to query keyboard mode.\n");
++        kbd_shutdown();
++    }
++
++    atexit(kbd_restore);
++
++    ss.ss_sp = kbd_fatal_stack;
++    ss.ss_size = sizeof(kbd_fatal_stack);
++    ss.ss_flags = 0;
++    sigaltstack(&ss, NULL);
++
++    memset(&sa, 0, sizeof(sa));
++    sa.sa_handler = kbd_fatal;
++    sa.sa_flags = SA_ONSTACK;
++    for (i = 0; i < arrlen(kbd_fatal_signals); i++)
++        sigaction(kbd_fatal_signals[i], &sa, NULL);
++
+     new_term = old_term;
+     new_term.c_iflag = 0;
+     new_term.c_lflag &= ~(ECHO | ICANON | ISIG);
+@@ -353,17 +403,39 @@ static int kbd_init(void)
+     flags = fcntl(kb, F_GETFL, 0);
+     fcntl(kb, F_SETFL, flags | O_NONBLOCK);
+ 
+-    printf("Ready to read keycodes. Press Backspace to exit.\n");
++    printf("Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.\n");
++
++    /* Stop fbcon drawing its cursor and messages over the game.  This
++       comes last: in graphics mode fbcon does not scroll either, so
++       whatever is printed from here on lands on a single line. */
++    if (ioctl(kb, KDGETMODE, &old_kdmode) != 0)
++        old_kdmode = -1;
++    else
++        ioctl(kb, KDSETMODE, KD_GRAPHICS);
+ 
+     return 0;
+ }
+ 
+ int kbd_read(int *pressed, unsigned char *key)
+ {
++    /* Bytes still to come of a three byte code.  In medium raw mode a
++       keycode above 127 is sent as keycode 0 and two more bytes, which
++       are not keys.  Doom has no use for those keycodes. */
++    static int skip = 0;
+     unsigned char data;
+ 
+-    if (read(kb, &data, 1) < 1) {
+-        return 0;
++    for (;;) {
++        if (read(kb, &data, 1) < 1) {
++            return 0;
++        }
++
++        if (skip > 0) {
++            skip--;
++        } else if ((data & 0x7F) == 0) {
++            skip = 2;
++        } else {
++            break;
++        }
+     }
+ 
+     *pressed = (data & 0x80) == 0x80;
+@@ -425,6 +497,30 @@ static void UpdateShiftStatus(int pressed, unsigned char key)
+     }
+ }
+ 
++// Which of Left Ctrl, Right Ctrl, Left Alt and Right Alt are held down,
++// one bit each, for the Ctrl+Alt+Backspace quit.
++
++static int ctrlaltdown = 0;
++
++static void UpdateCtrlAltStatus(int released, unsigned char key)
++{
++    int bit;
++
++    switch (key) {
++        case 0x1d: bit = 1; break;
++        case 0x61: bit = 2; break;
++        case 0x38: bit = 4; break;
++        case 0x64: bit = 8; break;
++        default: return;
++    }
++
++    if (released) {
++        ctrlaltdown &= ~bit;
++    } else {
++        ctrlaltdown |= bit;
++    }
++}
++
+ 
+ void I_GetEvent(void)
+ {
+@@ -436,8 +532,15 @@ void I_GetEvent(void)
+     
+     while (kbd_read(&pressed, &key))
+     {
+-        if (key == 0x0E) {
+-            kbd_shutdown();
++        // Note that "pressed" is set when a key is released.
++
++        UpdateCtrlAltStatus(pressed, key);
++
++        // Ctrl+Alt+Backspace quits at once.  I_Quit puts the VT back
++        // and runs the exit handlers.  Backspace alone is an ordinary key.
++
++        if (key == 0x0E && !pressed
++         && (ctrlaltdown & 3) != 0 && (ctrlaltdown & 12) != 0) {
+             I_Quit();
+         }
+ 
+@@ -479,6 +582,7 @@ void I_GetEvent(void)
+         }
+     }
+ 
++    I_ReadMouse();
+ 
+                 /*
+             case SDL_MOUSEMOTION:
+@@ -493,6 +597,10 @@ void I_GetEvent(void)
+ 
+ void I_InitInput(void)
+ {
++    // The mouse first: once kbd_init has put the VT in graphics mode,
++    // fbcon no longer scrolls, and messages land on top of each other.
++    I_InitMouse();
++
+     kbd_init();
+ 
+     //UpdateFocus();
+diff --git a/fbdoom/i_input_tty.h b/fbdoom/i_input_tty.h
+index 541b419..ac10f2e 100644
+--- a/fbdoom/i_input_tty.h
++++ b/fbdoom/i_input_tty.h
+@@ -1,4 +1,10 @@
+ #ifndef __I_INPUT_TTY__
+ #define __I_INPUT_TTY__
+ void kbd_shutdown(void);
++void kbd_restore(void);
++
++/* i_input_evdev_mouse.c */
++void I_InitMouse(void);
++void I_PollMouse(void);
++void I_ReadMouse(void);
+ #endif /* #ifndef __I_INPUT_TTY__ */
+\ No newline at end of file
+diff --git a/fbdoom/i_system.c b/fbdoom/i_system.c
+index 5d00091..8ad24c6 100644
+--- a/fbdoom/i_system.c
++++ b/fbdoom/i_system.c
+@@ -41,6 +41,7 @@
+ #include "m_argv.h"
+ #include "m_config.h"
+ #include "m_misc.h"
++#include "i_input_tty.h"
+ #include "i_joystick.h"
+ #include "i_sound.h"
+ #include "i_timer.h"
+@@ -247,6 +248,12 @@ void I_Quit (void)
+ {
+     atexit_listentry_t *entry;
+ 
++    // Put the VT back in text mode first.  While it is in graphics mode
++    // fbcon does not scroll, so anything the exit functions print (the
++    // -timedemo result, for one) would be written over by the next line.
++
++    kbd_restore();
++
+     // Run through all exit functions
+  
+     entry = exit_funcs; 
+@@ -259,9 +266,9 @@ void I_Quit (void)
+ 
+ #if ORIGCODE
+     SDL_Quit();
++#endif
+ 
+     exit(0);
+-#endif
+ }
+ 
+ #if !defined(_WIN32) && !defined(__MACOSX__)
+@@ -375,6 +382,10 @@ void I_Error (char *error, ...)
+         already_quitting = true;
+     }
+ 
++    // Put the VT back in text mode, so that the message can be read.
++
++    kbd_restore();
++
+     // Message first.
+     va_start(argptr, error);
+     //fprintf(stderr, "\nError: ");
+@@ -457,13 +468,9 @@ void I_Error (char *error, ...)
+     // abort();
+ #if ORIGCODE
+     SDL_Quit();
++#endif
+ 
+     exit(-1);
+-#else
+-    while (true)
+-    {
+-    }
+-#endif
+ }
+ 
+ //
+diff --git a/fbdoom/i_video_fbdev.c b/fbdoom/i_video_fbdev.c
+index c6e5925..760c369 100644
+--- a/fbdoom/i_video_fbdev.c
++++ b/fbdoom/i_video_fbdev.c
+@@ -30,6 +30,8 @@ rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
+ #include "m_argv.h"
+ #include "d_event.h"
+ #include "d_main.h"
++#include "i_input_tty.h"
++#include "i_system.h"
+ #include "i_video.h"
+ #include "z_zone.h"
+ 
+@@ -42,11 +44,13 @@ rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
+ #include <fcntl.h>
+ 
+ #include <stdarg.h>
++#include <time.h>
+ #include <sys/time.h>
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <linux/fb.h>
+ #include <sys/ioctl.h>
++#include <sys/mman.h>
+ 
+ //#define CMAP256
+ 
+@@ -63,6 +67,417 @@ struct color {
+ 
+ static struct color colors[256];
+ 
++/* 16 bpp fast path: the mapped frame buffer and a palette with each
++ * pixel in both halves of a word, so 2x scaling is one store. */
++static struct fb_fix_screeninfo fix;
++static byte *fb_mem = NULL;
++static uint32_t pal16[256];
++static int pal16_dirty = 1;
++
++/* How the picture gets to the screen, chosen once in I_InitGraphics:
++ * the original write() path, integer scaling into the mapping, or the
++ * general scaler into the mapping. */
++enum { BLIT_WRITE, BLIT_INTEGER, BLIT_SCALED };
++static int blit_mode = BLIT_WRITE;
++static int dst_x, dst_y, dst_w, dst_h;  /* where the picture goes */
++static uint16_t *xmap = NULL;   /* source column for each destination column */
++static uint16_t *ymap = NULL;   /* source row for each destination row */
++
++/* Widths that have a row loop of their own in the general scaler. */
++enum { XPAT_ANY, XPAT_2X, XPAT_5_2 };
++static int xpat = XPAT_ANY;
++
++/* Frame rate: always counted and printed at exit, drawn with -showfps. */
++static int showfps = 0;
++static unsigned int fps_frames = 0;     /* frames presented */
++static uint32_t fps_first, fps_last;    /* ms: when the first and the last were done */
++static uint32_t fps_mark;               /* ms: start of the current second */
++static unsigned int fps_mark_frames;
++static int fps_shown = -1;              /* nothing to show for the first second */
++static char fps_digits[4];              /* fps_shown as -showfps draws it */
++static int fps_cols;                    /* and its width in font columns */
++
++/* True if a 16 bpp rectangle is on the visible screen and inside the
++ * mapping, so that drawing it cannot write anywhere else.  The mapping
++ * has to be word aligned for the 32-bit stores. */
++static int fb_fits(int x, int y, int w, int h)
++{
++    return fb_mem != NULL && fb.bits_per_pixel == 16
++        && ((uintptr_t)fb_mem & 3) == 0 && (fix.line_length & 1) == 0
++        && x >= 0 && y >= 0 && w > 0 && h > 0
++        && x + w <= (int)fb.xres && y + h <= (int)fb.yres
++        && (uint32_t)(x + w) * 2 <= fix.line_length
++        && (uint64_t)(y + h - 1) * fix.line_length + (x + w) * 2 <= fix.smem_len;
++}
++
++static void pal16_update(void)
++{
++    int x;
++
++    for (x = 0; x < 256; x++) {
++        uint32_t v = ((uint32_t)(colors[x].r >> (8 - fb.red.length)) << fb.red.offset)
++                   | ((uint32_t)(colors[x].g >> (8 - fb.green.length)) << fb.green.offset)
++                   | ((uint32_t)(colors[x].b >> (8 - fb.blue.length)) << fb.blue.offset);
++        pal16[x] = (v & 0xffff) | (v << 16);
++    }
++    pal16_dirty = 0;
++}
++
++/* Integer scaling, centred. */
++static void blit16(int xo, int yo)
++{
++    const byte *in = I_VideoBuffer;
++    int x, y, k;
++
++    for (y = 0; y < SCREENHEIGHT; y++, in += SCREENWIDTH) {
++        byte *row = fb_mem + (yo + y * fb_scaling) * fix.line_length + xo * 2;
++
++        if (fb_scaling == 2 && (xo & 1) == 0) {
++            uint32_t *r0 = (uint32_t *)row;
++            uint32_t *r1 = (uint32_t *)(row + fix.line_length);
++            for (x = 0; x < SCREENWIDTH; x++)
++                r0[x] = r1[x] = pal16[in[x]];
++        } else {
++            uint16_t *o = (uint16_t *)row;
++            for (x = 0; x < SCREENWIDTH; x++)
++                for (k = 0; k < fb_scaling; k++)
++                    *o++ = (uint16_t)pal16[in[x]];
++            for (k = 1; k < fb_scaling; k++)
++                memcpy(row + k * fix.line_length, row, SCREENWIDTH * fb_scaling * 2);
++        }
++    }
++}
++
++/* Two pixels in one aligned 32-bit store: the first from the palette
++ * entry a, the second from b. */
++#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++#define PAL16_PAIR(a, b) (((a) & 0xffff) | ((b) & 0xffff0000))
++#else
++#define PAL16_PAIR(a, b) (((a) & 0xffff0000) | ((b) & 0xffff))
++#endif
++
++/* The row loops of the general scaler, for when everything is word
++ * aligned.  Each writes one source row to n destination rows at once, two
++ * pixels to a store, so that the rows need not be read back to be copied.
++ * n is 1, 2 or 3, and a constant wherever they are called, which takes the
++ * tests on it out of the loops.  There is always at least one store to do. */
++#define ROW_LOOP static inline __attribute__((always_inline)) void
++
++/* Any width: through xmap. */
++ROW_LOOP row16_any(byte *row, int line, const byte *in, int w, int n)
++{
++    uint32_t *o0 = (uint32_t *)row;
++    uint32_t *o1 = (uint32_t *)(row + (n > 1 ? line : 0));
++    uint32_t *o2 = (uint32_t *)(row + (n > 2 ? 2 * line : 0));
++    const uint16_t *xm = xmap, *end = xmap + w;
++
++    do {
++        uint32_t v = PAL16_PAIR(pal16[in[xm[0]]], pal16[in[xm[1]]]);
++
++        *o0++ = v;
++        if (n > 1)
++            *o1++ = v;
++        if (n > 2)
++            *o2++ = v;
++        xm += 2;
++    } while (xm != end);
++}
++
++/* Twice the width (320 to 640): each source pixel is one store. */
++ROW_LOOP row16_2x(byte *row, int line, const byte *in, int n)
++{
++    uint32_t *o0 = (uint32_t *)row;
++    uint32_t *o1 = (uint32_t *)(row + (n > 1 ? line : 0));
++    uint32_t *o2 = (uint32_t *)(row + (n > 2 ? 2 * line : 0));
++    int x = 0;
++
++    do {
++        uint32_t v = pal16[in[x]];
++
++        o0[x] = v;
++        if (n > 1)
++            o1[x] = v;
++        if (n > 2)
++            o2[x] = v;
++    } while (++x < SCREENWIDTH);
++}
++
++/* Two and a half times the width (320 to 800): the source pixels a b c d
++ * become a a b b b c c d d d, which is five stores. */
++#define PUT5(o) ((o)[0] = a, (o)[1] = b, (o)[2] = bc, (o)[3] = cd, (o)[4] = d, (o) += 5)
++
++ROW_LOOP row16_5_2(byte *row, int line, const byte *in, int n)
++{
++    uint32_t *o0 = (uint32_t *)row;
++    uint32_t *o1 = (uint32_t *)(row + (n > 1 ? line : 0));
++    uint32_t *o2 = (uint32_t *)(row + (n > 2 ? 2 * line : 0));
++    const byte *end = in + SCREENWIDTH;
++
++    do {
++        uint32_t a = pal16[in[0]], b = pal16[in[1]];
++        uint32_t c = pal16[in[2]], d = pal16[in[3]];
++        uint32_t bc = PAL16_PAIR(b, c), cd = PAL16_PAIR(c, d);
++
++        PUT5(o0);
++        if (n > 1)
++            PUT5(o1);
++        if (n > 2)
++            PUT5(o2);
++        in += 4;
++    } while (in != end);
++}
++
++/* One source row to n destination rows, by the loop that suits the width. */
++ROW_LOOP rows16(byte *row, int line, const byte *in, int w, int n)
++{
++    if (xpat == XPAT_5_2)
++        row16_5_2(row, line, in, n);
++    else if (xpat == XPAT_2X)
++        row16_2x(row, line, in, n);
++    else
++        row16_any(row, line, in, w, n);
++}
++
++/* Which row loop suits the columns in xmap.  A special one is only chosen
++ * when every entry of xmap agrees with it, so that it draws exactly what
++ * the loop through xmap would. */
++static int xmap_pattern(int w)
++{
++    int is_2x = w == SCREENWIDTH * 2;
++    int is_5_2 = w * 2 == SCREENWIDTH * 5 && SCREENWIDTH % 4 == 0;
++    int i;
++
++    for (i = 0; i < w; i++) {
++        if (xmap[i] != i / 2)
++            is_2x = 0;
++        if (xmap[i] != i / 5 * 2 + (i % 5 >= 2))
++            is_5_2 = 0;
++    }
++    return is_2x ? XPAT_2X : is_5_2 ? XPAT_5_2 : XPAT_ANY;
++}
++
++/* Any size, up or down: nearest neighbour through xmap and ymap, straight
++ * into the mapping.  Each source row is built once, and copied to the other
++ * destination rows that show it. */
++static void blit16_scaled(void)
++{
++    const int line = fix.line_length, w = dst_w;
++    byte *row = fb_mem + dst_y * line + dst_x * 2;
++    int pairs = ((uintptr_t)row & 3) == 0 && (line & 3) == 0 && (w & 1) == 0;
++    int x, y, n, k;
++
++    for (y = 0; y < dst_h; y += n, row += n * line) {
++        const byte *in = I_VideoBuffer + ymap[y] * SCREENWIDTH;
++
++        /* n destination rows show this source row */
++        for (n = 1; y + n < dst_h && ymap[y + n] == ymap[y]; n++)
++            ;
++
++        if (pairs) {
++            /* Up to three rows are written at once, as the 2x path does;
++             * any more are copied below. */
++            k = n < 3 ? n : 3;
++            if (k == 1)
++                rows16(row, line, in, w, 1);
++            else if (k == 2)
++                rows16(row, line, in, w, 2);
++            else
++                rows16(row, line, in, w, 3);
++        } else {
++            uint16_t *o = (uint16_t *)row;
++
++            for (x = 0; x < w; x++)
++                o[x] = (uint16_t)pal16[in[xmap[x]]];
++            k = 1;
++        }
++
++        for (; k < n; k++)
++            memcpy(row + k * line, row, w * 2);
++    }
++}
++
++/* Choose how the picture is put on the screen.  -scaling N keeps integer
++ * scaling.  Otherwise the general scaler fills the screen, or with -aspect
++ * the largest 4:3 rectangle that fits.  Whatever the general scaler cannot
++ * do is left to integer scaling. */
++static void blit_select(void)
++{
++    int fixed = M_CheckParmWithArgs("-scaling", 1) > 0;
++    int fit = fb.xres / SCREENWIDTH;
++    int w = fb.xres, h = fb.yres, i;
++    const char *how = "fill";
++
++    if (fb.yres / SCREENHEIGHT < fit)
++        fit = fb.yres / SCREENHEIGHT;
++
++    /* A factor that does not fit would run off the end of the buffers. */
++    if (fixed && (fb_scaling < 1 || fb_scaling > fit)) {
++        printf("I_InitGraphics: scaling factor %d does not fit, ignored\n", fb_scaling);
++        fb_scaling = fit;
++        fixed = 0;
++    }
++
++    if (!fixed) {
++        if (M_CheckParm("-aspect") > 0) {
++            how = "aspect";
++            if (w * 3 > h * 4)
++                w = h * 4 / 3;
++            else
++                h = w * 3 / 4;
++        }
++        dst_x = ((int)fb.xres - w) / 2;
++        dst_y = ((int)fb.yres - h) / 2;
++
++        if (fb_fits(dst_x, dst_y, w, h)) {
++            xmap = malloc(w * sizeof(*xmap));
++            ymap = malloc(h * sizeof(*ymap));
++        }
++        if (xmap != NULL && ymap != NULL) {
++            /* Sample the source at the centre of each destination pixel. */
++            for (i = 0; i < w; i++)
++                xmap[i] = ((2 * i + 1) * SCREENWIDTH) / (2 * w);
++            for (i = 0; i < h; i++)
++                ymap[i] = ((2 * i + 1) * SCREENHEIGHT) / (2 * h);
++            xpat = xmap_pattern(w);
++            blit_mode = BLIT_SCALED;
++        } else {
++            free(xmap);
++            free(ymap);
++            xmap = ymap = NULL;
++        }
++    }
++
++    if (blit_mode != BLIT_SCALED) {
++        /* Integer scaling cannot make the picture smaller, and would
++         * leave the screen black.  The VT is still in text mode here. */
++        if (fb_scaling < 1)
++            I_Error("I_InitGraphics: the screen is smaller than %dx%d, and the "
++                    "picture can only be scaled down in a mapped 16 bpp frame buffer",
++                    SCREENWIDTH, SCREENHEIGHT);
++
++        w = SCREENWIDTH * fb_scaling;
++        h = SCREENHEIGHT * fb_scaling;
++        dst_x = ((int)fb.xres - w) / 2;
++        dst_y = ((int)fb.yres - h) / 2;
++        if (fb_scaling >= 1 && (fix.line_length & 3) == 0 && fb_fits(dst_x, dst_y, w, h))
++            blit_mode = BLIT_INTEGER;
++        how = blit_mode == BLIT_INTEGER ? "integer" : "integer, write() path";
++    }
++    dst_w = w;
++    dst_h = h;
++
++    printf("I_InitGraphics: %dx%d -> %dx%d at (%d,%d), %s\n",
++            SCREENWIDTH, SCREENHEIGHT, dst_w, dst_h, dst_x, dst_y, how);
++}
++
++static uint32_t fps_ms(void)
++{
++    struct timespec ts;
++
++    clock_gettime(CLOCK_MONOTONIC, &ts);
++    return (uint32_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
++}
++
++/* The number for -showfps.  Its digits are worked out here, once a second,
++ * and not for every frame. */
++static void fps_set(int fps)
++{
++    fps_shown = fps;
++    fps_cols = snprintf(fps_digits, sizeof(fps_digits), "%d", fps > 999 ? 999 : fps) * 4 + 1;
++}
++
++/* Call when a frame has been presented.  A rate is the frames after the
++ * first one over the time since the first one, so the clock starts when
++ * the first frame is done. */
++static void fps_frame(void)
++{
++    uint32_t ms;
++
++    fps_last = fps_ms();
++    if (++fps_frames == 1) {
++        fps_first = fps_mark = fps_last;
++        fps_mark_frames = 1;
++    }
++
++    ms = fps_last - fps_mark;
++    if (ms >= 1000) {
++        fps_set(((fps_frames - fps_mark_frames) * 1000 + ms / 2) / ms);
++        fps_mark = fps_last;
++        fps_mark_frames = fps_frames;
++    }
++}
++
++/* Registered with atexit() before i_input_tty.c registers its own handler,
++ * so it runs after that one has put the VT back in text mode. */
++static void fps_report(void)
++{
++    uint32_t ms = fps_last - fps_first;
++    unsigned int tenths, fps10;
++
++    if (fps_frames == 0)
++        return;
++    if (fps_frames == 1 || ms == 0) {
++        /* no time between frames to work out a rate from */
++        fprintf(stderr, "fbdoom: %u frame%s\n", fps_frames, fps_frames == 1 ? "" : "s");
++        return;
++    }
++    tenths = (ms + 50) / 100;
++    fps10 = ((uint64_t)(fps_frames - 1) * 10000 + ms / 2) / ms;
++    fprintf(stderr, "fbdoom: %u frames in %u.%u s (%u.%u fps)\n", fps_frames,
++            tenths / 10, tenths % 10, fps10 / 10, fps10 % 10);
++}
++
++/* 3x5 digits, one bit per pixel, top row first. */
++static const uint16_t fps_font[10] = {
++    0x7b6f, 0x2c97, 0x73e7, 0x73cf, 0x5bc9, 0x79cf, 0x79ef, 0x7249, 0x7bef, 0x7bcf
++};
++
++/* -showfps: white digits on a black box in the bottom right corner of the
++ * picture, drawn into the mapping after the blit.  The bottom rows are the
++ * last ones the blit writes, so the box is put back almost at once. */
++static void fps_draw(void)
++{
++    const char *digits = fps_digits;
++    int cols = fps_cols, s, cx, cy, i, j;
++    uint16_t white, v;
++    byte *box;
++
++    if (fps_shown < 0)
++        return;
++
++    /* The size of one font pixel: big enough to read on 800x480, and
++     * small enough for the box to stay inside the picture. */
++    s = dst_h / 96;
++    if (s < 1)
++        s = 1;
++    if (s > dst_w / cols)
++        s = dst_w / cols;
++    if (s < 1 || 7 * s > dst_h)
++        return;
++
++    white = (((1 << fb.red.length) - 1) << fb.red.offset)
++          | (((1 << fb.green.length) - 1) << fb.green.offset)
++          | (((1 << fb.blue.length) - 1) << fb.blue.offset);
++    box = fb_mem + (dst_y + dst_h - 7 * s) * fix.line_length
++        + (dst_x + dst_w - cols * s) * 2;
++
++    /* One column of padding, then three columns and a gap for each digit;
++     * one row of padding above and below the five rows. */
++    for (cy = 0; cy < 7; cy++) {
++        for (cx = 0; cx < cols; cx++) {
++            v = 0;
++            if (cy >= 1 && cy <= 5 && (cx & 3) != 0
++                && ((fps_font[digits[cx / 4] - '0'] >> (18 - cy * 3 - (cx & 3))) & 1))
++                v = white;
++            for (j = 0; j < s; j++) {
++                uint16_t *o = (uint16_t *)(box + (cy * s + j) * fix.line_length) + cx * s;
++                for (i = 0; i < s; i++)
++                    o[i] = v;
++            }
++        }
++    }
++}
++
+ // The screen buffer; this is modified to draw things to the screen
+ 
+ byte *I_VideoBuffer = NULL;
+@@ -196,6 +611,21 @@ void I_InitGraphics (void)
+     }
+ 
+ 
++    /* Map the frame buffer; fall back to write() if that fails */
++    if (ioctl(fd_fb, FBIOGET_FSCREENINFO, &fix) == 0 && fix.smem_len != 0) {
++        fb_mem = mmap(NULL, fix.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fd_fb, 0);
++        if (fb_mem == MAP_FAILED)
++            fb_mem = NULL;
++    }
++    puts(fb_mem ? "I_InitGraphics: mmap, 16 bpp fast path if it fits"
++                : "I_InitGraphics: write() path");
++
++    blit_select();
++    showfps = M_CheckParm("-showfps") > 0;
++
++    /* Before I_InitInput, so that it runs after the VT has been put back */
++    atexit(fps_report);
++
+     /* Allocate screen to draw to */
+ 	I_VideoBuffer = (byte*)Z_Malloc (SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);  // For DOOM to draw on
+ 	I_VideoBuffer_FB = (byte*)malloc(fb.xres * fb.yres * (fb.bits_per_pixel/8));     // For a single write() syscall to fbdev
+@@ -204,6 +634,11 @@ void I_InitGraphics (void)
+ 
+     extern int I_InitInput(void);
+     I_InitInput();
++
++    /* Clear the console image; fbcon stops drawing once I_InitInput
++     * has put the VT in KD_GRAPHICS. */
++    if (fb_mem)
++        memset(fb_mem, 0, fix.smem_len);
+ }
+ 
+ void I_ShutdownGraphics (void)
+@@ -406,6 +841,24 @@ void I_FinishUpdate (void)
+     int x_offset, y_offset, x_offset_end;
+     unsigned char *line_in, *line_out;
+ 
++    /* Empty the mouse queues before the blit and after it, so that they
++     * do not fill up meanwhile. */
++    I_PollMouse();
++
++    if (blit_mode != BLIT_WRITE) {
++        if (pal16_dirty)
++            pal16_update();
++        if (blit_mode == BLIT_SCALED)
++            blit16_scaled();
++        else
++            blit16(dst_x, dst_y);
++        if (showfps)
++            fps_draw();
++        fps_frame();
++        I_PollMouse();
++        return;
++    }
++
+     /* Offsets in case FB is bigger than DOOM */
+     /* 600 = fb heigt, 200 screenheight */
+     /* 600 = fb heigt, 200 screenheight */
+@@ -444,6 +897,9 @@ void I_FinishUpdate (void)
+     /* Start drawing from y-offset */
+     lseek(fd_fb, y_offset * fb.xres, SEEK_SET);
+     write(fd_fb, I_VideoBuffer_FB, (SCREENHEIGHT * fb_scaling * (fb.bits_per_pixel/8)) * fb.xres); /* draw only portion used by doom + x-offsets */
++
++    fps_frame();
++    I_PollMouse();
+ }
+ 
+ //
+@@ -488,6 +944,7 @@ void I_SetPalette (byte* palette)
+         colors[i].g = gammatable[usegamma][*palette++];
+         colors[i].b = gammatable[usegamma][*palette++];
+     }
++    pal16_dirty = 1;
+ 
+     /* Set new color map in kernel framebuffer driver */
+     //XXX FIXME ioctl(fd_fb, IOCTL_FB_PUTCMAP, colors);

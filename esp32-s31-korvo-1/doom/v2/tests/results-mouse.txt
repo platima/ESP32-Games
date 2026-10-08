@@ -1,0 +1,82 @@
+sizeof(struct kernel_input_event) = 16, sizeof(struct input_event) = 16, sizeof(long) = 4
+ok    the event struct is two longs and 8 bytes
+ok    no mouse: nothing read, nothing posted
+ok    nothing waiting: nothing posted, and no blocking
+ok    and that took one read()
+ok    movement adds up: x 3+4, y 2 -> one event, x 7, y -2
+ok    nothing new: nothing posted
+ok    wheel, side button and EV_MSC are ignored
+ok    x 10 -> 10 (at the threshold)
+ok    x 11 -> 12
+ok    x 25 -> 40
+ok    x -10 -> -10
+ok    x -11 -> -12
+ok    x -25 -> -40
+ok    x 6+6 -> 14 (the sum is accelerated, not the parts)
+ok    y 25 -> -40 (down is backwards)
+ok    y -25 -> 40
+ok    x 5-5: no movement, nothing posted
+ok    x -2147483648 -> -65524 (held to -32767, then accelerated)
+ok    x 2147483647 -> 65524
+ok    y -2147483648 -> 65524
+ok    y 2147483647 -> -65524
+ok    x 2147483647 twice -> 65524
+ok    x -2147483648 twice -> -65524
+ok    x 30000+30000 -> 65524 (the sum is held too)
+ok    x 32767 -> 65524
+ok    x -32767 -> -65524
+ok    x 32766 -> 65522 (below the limit, untouched)
+ok    I_PollMouse reads what is waiting, with one read(), and posts nothing
+ok    again, and once more with nothing waiting
+ok    I_ReadMouse then posts all of it as one event: x 3+4+6 -> 16, y 1 -> -1
+ok    and only once
+ok    a button read by I_PollMouse is not posted by it
+ok    but by the next I_ReadMouse
+ok    and so is its release
+ok    one report waiting: one read(), which comes back short
+ok    exactly one buffer of events: a second read() to be sure
+ok    left down -> buttons 1
+ok    left still down, nothing new: nothing posted
+ok    movement with left held keeps buttons 1
+ok    right down -> buttons 3
+ok    middle down -> buttons 7
+ok    left up -> buttons 6
+ok    right and middle up with movement -> one event, buttons 0
+ok    -novert: y is dropped, x is kept
+ok    one event and 5 bytes of the next: only the first counts
+ok    the 5 bytes wait
+ok    8 bytes of it: still waiting
+ok    the rest arrives: x 100 -> 190, stream still in step
+ok    and the next event reads correctly
+ok    100 events at once are all read: x 50 -> 90, y 50 -> -90
+ok    in six full reads and a short one
+ok    left down
+ok    SYN_DROPPED, state unknown (not a device): buttons released
+ok    two mice: movement adds, buttons combine
+ok    one unplugged with a button held: button released, the other still works
+ok    its descriptor is closed, the other is not
+ok    a mouse that goes away is dropped by I_PollMouse too
+ok    what was read from it before that is still posted
+ok    read() error (EBADF): carried on with the others
+ok    the failing descriptor is closed and forgotten
+ok    and nothing more is posted
+ok    -nomouse: nothing is opened
+ok    -novert is read
+Using mouse on /dev/input/event1 (Fake Mouse A)
+Using mouse on /dev/input/event5 (Fake Mouse B with a name that is much too long to fit in the bu)
+Using mouse on /dev/input/event6 (Fake Mouse C)
+Using mouse on /dev/input/event7 (Fake Mouse D)
+ok    no -novert
+ok    four mice are used, the fifth is left alone
+ok    event1, event5, event6 and event7 are the ones
+ok    the keyboard, the pad and the knob are closed again
+ok    the mice are left open
+ok    event8 was never opened
+ok    everything is opened O_RDONLY | O_NONBLOCK
+ok    no ioctl other than the queries (no EVIOCGRAB)
+ok    events from the found mice arrive
+ok    SYN_DROPPED: the buttons are asked for again (left is down)
+ok    and released
+No mouse found.
+ok    no devices: event0 to event31 tried, none used
+PASS: test_mouse, 0 failed

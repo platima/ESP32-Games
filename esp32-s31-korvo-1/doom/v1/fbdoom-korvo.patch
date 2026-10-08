@@ -1,0 +1,228 @@
+diff --git a/fbdoom/i_input_tty.c b/fbdoom/i_input_tty.c
+index 95e1b60..b1a539e 100644
+--- a/fbdoom/i_input_tty.c
++++ b/fbdoom/i_input_tty.c
+@@ -25,6 +25,7 @@
+ #include <fcntl.h>
+ #include <stdio.h>
+ #include <termios.h>
++#include <signal.h>
+ #include <sys/ioctl.h>
+ #include <linux/keyboard.h>
+ #include <linux/kd.h>
+@@ -254,6 +255,28 @@ int tty_is_kbd(int fd)
+ static int old_mode = -1;
+ static struct termios old_term;
+ static int kb = -1; /* keyboard file descriptor */
++static int old_kdmode = -1;
++
++/* Put the VT back: keyboard mode, termios and text mode. */
++static void kbd_restore(void)
++{
++    if (old_mode != -1) {
++        ioctl(kb, KDSKBMODE, old_mode);
++        tcsetattr(kb, TCSANOW, &old_term);
++        old_mode = -1;
++    }
++    if (old_kdmode != -1) {
++        ioctl(kb, KDSETMODE, old_kdmode);
++        old_kdmode = -1;
++    }
++}
++
++static void kbd_fatal(int sig)
++{
++    kbd_restore();
++    signal(sig, SIG_DFL);
++    raise(sig);
++}
+ 
+ void kbd_shutdown(void)
+ {
+@@ -263,10 +286,7 @@ void kbd_shutdown(void)
+     fflush(stdout);
+ 
+     printf("Exiting normally.\n");
+-    if (old_mode != -1) {
+-        ioctl(kb, KDSKBMODE, old_mode);
+-        tcsetattr(kb, 0, &old_term);
+-    }
++    kbd_restore();
+ 
+     if (kb > 3)
+         close(kb);
+@@ -333,6 +353,15 @@ static int kbd_init(void)
+         kbd_shutdown();
+     }
+ 
++    atexit(kbd_restore);
++    signal(SIGSEGV, kbd_fatal);
++    signal(SIGBUS, kbd_fatal);
++    signal(SIGILL, kbd_fatal);
++    signal(SIGFPE, kbd_fatal);
++    signal(SIGABRT, kbd_fatal);
++    signal(SIGTERM, kbd_fatal);
++    signal(SIGHUP, kbd_fatal);
++
+     new_term = old_term;
+     new_term.c_iflag = 0;
+     new_term.c_lflag &= ~(ECHO | ICANON | ISIG);
+@@ -349,6 +378,12 @@ static int kbd_init(void)
+         kbd_shutdown();
+     }
+ 
++    /* Stop fbcon drawing its cursor and messages over the game. */
++    if (ioctl(kb, KDGETMODE, &old_kdmode) != 0)
++        old_kdmode = -1;
++    else
++        ioctl(kb, KDSETMODE, KD_GRAPHICS);
++
+     /* Put in non-blocking mode */
+     flags = fcntl(kb, F_GETFL, 0);
+     fcntl(kb, F_SETFL, flags | O_NONBLOCK);
+diff --git a/fbdoom/i_system.c b/fbdoom/i_system.c
+index 5d00091..70f0fb2 100644
+--- a/fbdoom/i_system.c
++++ b/fbdoom/i_system.c
+@@ -259,9 +259,9 @@ void I_Quit (void)
+ 
+ #if ORIGCODE
+     SDL_Quit();
++#endif
+ 
+     exit(0);
+-#endif
+ }
+ 
+ #if !defined(_WIN32) && !defined(__MACOSX__)
+@@ -457,13 +457,9 @@ void I_Error (char *error, ...)
+     // abort();
+ #if ORIGCODE
+     SDL_Quit();
++#endif
+ 
+     exit(-1);
+-#else
+-    while (true)
+-    {
+-    }
+-#endif
+ }
+ 
+ //
+diff --git a/fbdoom/i_video_fbdev.c b/fbdoom/i_video_fbdev.c
+index c6e5925..5ddf6ba 100644
+--- a/fbdoom/i_video_fbdev.c
++++ b/fbdoom/i_video_fbdev.c
+@@ -47,6 +47,7 @@ rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
+ #include <sys/socket.h>
+ #include <linux/fb.h>
+ #include <sys/ioctl.h>
++#include <sys/mman.h>
+ 
+ //#define CMAP256
+ 
+@@ -63,6 +64,55 @@ struct color {
+ 
+ static struct color colors[256];
+ 
++/* 16 bpp fast path: the mapped frame buffer and a palette with each
++ * pixel in both halves of a word, so 2x scaling is one store. */
++static struct fb_fix_screeninfo fix;
++static byte *fb_mem = NULL;
++static uint32_t pal16[256];
++static int pal16_dirty = 1;
++
++static int blit16_ok(int *xo, int *yo)
++{
++    *xo = ((int)fb.xres - SCREENWIDTH * fb_scaling) / 2;
++    *yo = ((int)fb.yres - SCREENHEIGHT * fb_scaling) / 2;
++    return fb_mem != NULL && fb.bits_per_pixel == 16 && fb_scaling >= 1
++        && *xo >= 0 && *yo >= 0 && (fix.line_length & 3) == 0;
++}
++
++static void blit16(int xo, int yo)
++{
++    const byte *in = I_VideoBuffer;
++    int x, y, k;
++
++    if (pal16_dirty) {
++        for (x = 0; x < 256; x++) {
++            uint32_t v = ((uint32_t)(colors[x].r >> (8 - fb.red.length)) << fb.red.offset)
++                       | ((uint32_t)(colors[x].g >> (8 - fb.green.length)) << fb.green.offset)
++                       | ((uint32_t)(colors[x].b >> (8 - fb.blue.length)) << fb.blue.offset);
++            pal16[x] = (v & 0xffff) | (v << 16);
++        }
++        pal16_dirty = 0;
++    }
++
++    for (y = 0; y < SCREENHEIGHT; y++, in += SCREENWIDTH) {
++        byte *row = fb_mem + (yo + y * fb_scaling) * fix.line_length + xo * 2;
++
++        if (fb_scaling == 2 && (xo & 1) == 0) {
++            uint32_t *r0 = (uint32_t *)row;
++            uint32_t *r1 = (uint32_t *)(row + fix.line_length);
++            for (x = 0; x < SCREENWIDTH; x++)
++                r0[x] = r1[x] = pal16[in[x]];
++        } else {
++            uint16_t *o = (uint16_t *)row;
++            for (x = 0; x < SCREENWIDTH; x++)
++                for (k = 0; k < fb_scaling; k++)
++                    *o++ = (uint16_t)pal16[in[x]];
++            for (k = 1; k < fb_scaling; k++)
++                memcpy(row + k * fix.line_length, row, SCREENWIDTH * fb_scaling * 2);
++        }
++    }
++}
++
+ // The screen buffer; this is modified to draw things to the screen
+ 
+ byte *I_VideoBuffer = NULL;
+@@ -196,6 +246,15 @@ void I_InitGraphics (void)
+     }
+ 
+ 
++    /* Map the frame buffer; fall back to write() if that fails */
++    if (ioctl(fd_fb, FBIOGET_FSCREENINFO, &fix) == 0 && fix.smem_len != 0) {
++        fb_mem = mmap(NULL, fix.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fd_fb, 0);
++        if (fb_mem == MAP_FAILED)
++            fb_mem = NULL;
++    }
++    puts(fb_mem ? "I_InitGraphics: mmap, 16 bpp fast path if it fits"
++                : "I_InitGraphics: write() path");
++
+     /* Allocate screen to draw to */
+ 	I_VideoBuffer = (byte*)Z_Malloc (SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);  // For DOOM to draw on
+ 	I_VideoBuffer_FB = (byte*)malloc(fb.xres * fb.yres * (fb.bits_per_pixel/8));     // For a single write() syscall to fbdev
+@@ -204,6 +263,11 @@ void I_InitGraphics (void)
+ 
+     extern int I_InitInput(void);
+     I_InitInput();
++
++    /* Clear the console image; fbcon stops drawing once I_InitInput
++     * has put the VT in KD_GRAPHICS. */
++    if (fb_mem)
++        memset(fb_mem, 0, fix.smem_len);
+ }
+ 
+ void I_ShutdownGraphics (void)
+@@ -406,6 +470,11 @@ void I_FinishUpdate (void)
+     int x_offset, y_offset, x_offset_end;
+     unsigned char *line_in, *line_out;
+ 
++    if (blit16_ok(&x_offset, &y_offset)) {
++        blit16(x_offset, y_offset);
++        return;
++    }
++
+     /* Offsets in case FB is bigger than DOOM */
+     /* 600 = fb heigt, 200 screenheight */
+     /* 600 = fb heigt, 200 screenheight */
+@@ -488,6 +557,7 @@ void I_SetPalette (byte* palette)
+         colors[i].g = gammatable[usegamma][*palette++];
+         colors[i].b = gammatable[usegamma][*palette++];
+     }
++    pal16_dirty = 1;
+ 
+     /* Set new color map in kernel framebuffer driver */
+     //XXX FIXME ioctl(fd_fb, IOCTL_FB_PUTCMAP, colors);

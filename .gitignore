@@ -53,3 +53,14 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Game data. Never commit it: bring your own copy.
+*.[wW][aA][dD]
+*.[wW][lL][0-9]
+*.[sS][oO][dD]
+*.[sS][dD][mM]
+
+# Local builds. Binaries go on the releases page, not in the tree.
+build/
+out/
+*.img

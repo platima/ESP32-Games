@@ -1,0 +1,673 @@
+== timedemo-quit ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] Left Ctrl + Left Alt + Backspace
+[event] keydown 0xa3
+[event] keydown 0xb8
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+timed 3 gametics in 1 realtics (105.000000 fps)
+
+fbdoom: 3 frames
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console timedemo-quit (status 255)
+== timedemo-end ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] the demo ends
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+timed 3 gametics in 1 realtics (105.000000 fps)
+
+fbdoom: 3 frames
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console timedemo-end (status 255)
+== play-quit ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] Left Ctrl + Left Alt + Backspace
+[event] keydown 0xa3
+[event] keydown 0xb8
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[exit function] M_SaveDefaults
+[exit function] D_Endoom
+fbdoom: 3 frames in 0.0 s (2000.0 fps)
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console play-quit (status 0)
+== play-quit-right ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] Right Ctrl + Right Alt + Backspace
+[event] keydown 0xa3
+[event] keydown 0xb8
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[exit function] M_SaveDefaults
+[exit function] D_Endoom
+fbdoom: 3 frames
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console play-quit-right (status 0)
+== play-quit-mixed ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] Right Alt + Left Ctrl + Backspace
+[event] keydown 0xb8
+[event] keydown 0xa3
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[exit function] M_SaveDefaults
+[exit function] D_Endoom
+fbdoom: 3 frames in 0.0 s (2000.0 fps)
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console play-quit-mixed (status 0)
+== play-quit-media ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] Ctrl + Alt, a multimedia key, Backspace
+[event] keydown 0xa3
+[event] keydown 0xb8
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[exit function] M_SaveDefaults
+[exit function] D_Endoom
+fbdoom: 3 frames
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console play-quit-media (status 0)
+== keys ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] Backspace
+[event] keydown 0x7f
+[event] keyup 0x7f
+[test] Right Ctrl
+[event] keydown 0xa3
+[event] keyup 0xa3
+[test] Right Alt
+[event] keydown 0xb8
+[event] keyup 0xb8
+[test] Left Ctrl
+[event] keydown 0xa3
+[event] keyup 0xa3
+[test] Left Alt
+[event] keydown 0xb8
+[event] keyup 0xb8
+[test] Ctrl + Backspace
+[event] keydown 0xa3
+[event] keydown 0x7f
+[event] keyup 0x7f
+[event] keyup 0xa3
+[test] Alt + Backspace
+[event] keydown 0xb8
+[event] keydown 0x7f
+[event] keyup 0x7f
+[event] keyup 0xb8
+[test] Ctrl, Alt, Alt up, Backspace
+[event] keydown 0xa3
+[event] keydown 0xb8
+[event] keyup 0xb8
+[event] keydown 0x7f
+[event] keyup 0x7f
+[event] keyup 0xa3
+[test] Ctrl, Ctrl up, Alt, Backspace
+[event] keydown 0xa3
+[event] keyup 0xa3
+[event] keydown 0xb8
+[event] keydown 0x7f
+[event] keyup 0x7f
+[event] keyup 0xb8
+[test] Ctrl + Alt + Backspace up, with no Backspace down
+[event] keydown 0xa3
+[event] keydown 0xb8
+[event] keyup 0x7f
+[event] keyup 0xb8
+[event] keyup 0xa3
+[test] A multimedia key
+[test] A multimedia key, a byte at a time
+[test] Backspace once more
+[event] keydown 0x7f
+[event] keyup 0x7f
+[test] still running; quit from the menu
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[exit function] M_SaveDefaults
+[exit function] D_Endoom
+fbdoom: 3 frames
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console keys (status 0)
+== noframes ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[exit function] M_SaveDefaults
+[exit function] D_Endoom
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console noframes (status 0)
+== error-early ==
+W_InitFiles: no files found
+
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console error-early (status 255)
+== error-unread ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] four key bytes that are not read, then an error
+[vt] KDSKBMODE as it was
+[vt] tcflush: 4 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+Z_Malloc: failed on allocation of 12345 bytes
+
+fbdoom: 3 frames
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console error-unread (status 255)
+== exit ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] exit(3)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+fbdoom: 3 frames
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console exit (status 3)
+== kbmode-fails ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+Unable to set mediumraw mode.
+Cleaning up.
+Exiting normally.
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] closed
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console kbmode-fails (status 0)
+== tcgetattr-fails ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+Unable to query terminal settings.
+Cleaning up.
+Exiting normally.
+[vt] closed
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console tcgetattr-fails (status 0)
+== null-store ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] a store through a null pointer
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console null-store (status -11)
+== abort ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] abort()
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console abort (status -6)
+== stack-overflow ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] recursion without end
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console stack-overflow (status -11)
+== segv ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(11)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console segv (status -11)
+== sigbus ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(7)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console sigbus (status -7)
+== sigill ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(4)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console sigill (status -4)
+== sigfpe ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(8)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console sigfpe (status -8)
+== sigabrt ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(6)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console sigabrt (status -6)
+== sigterm ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(15)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console sigterm (status -15)
+== sighup ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(1)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console sighup (status -1)
+== sigint ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(2)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console sigint (status -2)
+== sigquit ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(3)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console sigquit (status -3)
+== sigpipe ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(13)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console sigpipe (status -13)
+== sigalrm ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(14)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console sigalrm (status -14)
+== sigusr1 ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(10)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console sigusr1 (status -10)
+== sigusr2 ==
+I_InitGraphics: framebuffer: x_res: 800, y_res: 480, x_virtual: 800, y_virtual: 480, bpp: 16, grayscale: 0
+I_InitGraphics: framebuffer: RGBA: 5650, red_off: 11, green_off: 5, blue_off: 0, transp_off: 0
+I_InitGraphics: DOOM screen size: w x h: 320 x 200
+I_InitGraphics: Auto-scaling factor: 2
+I_InitGraphics: mmap, 16 bpp fast path if it fits
+I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+No mouse found.
+101-key keyboard found.
+Using keyboard on /dev/tty.
+[vt] tcsetattr raw
+[vt] KDSKBMODE K_MEDIUMRAW
+Ready to read keycodes. Press Ctrl+Alt+Backspace to exit.
+[vt] KDSETMODE KD_GRAPHICS
+[test] raise(12)
+[vt] KDSKBMODE as it was
+[vt] tcflush: 0 unread key bytes dropped
+[vt] tcsetattr as it was
+[vt] KDSETMODE KD_TEXT
+[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was
+PASS test_console sigusr2 (status -12)

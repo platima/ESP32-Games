@@ -1,0 +1,95 @@
+Testing fbDOOM v2 on the Korvo-1
+================================
+
+v2 has not run on the board. v1 has, and it stays installed, so there is always a way
+back. Each step below risks a little more than the one before it. Stop at the first one
+that goes wrong and note what you saw.
+
+Setting up
+==========
+1. Build fbdoom-korvo-v2 (see BUILD.txt) and copy it onto the card's KORVO_SD partition,
+   next to doom1.wad. Leave fbdoom-korvo (that is v1) where it is.
+2. On the panel:
+     cp /mnt/sd/fbdoom-korvo-v2 /root/fbdoom2
+     chmod +x /root/fbdoom2
+   v2 is now /root/fbdoom2. v1 is still /root/fbdoom.
+
+Getting back to v1 at any point: if the panel console is dead, power cycle. Then run
+/root/fbdoom exactly as before. v2 changes nothing else on the card or the board.
+
+The short version
+=================
+If you would rather just try it:
+     /root/fbdoom2 -iwad /mnt/sd/doom1.wad -mb 4
+The picture should fill the screen and the mouse should turn you. Ctrl+Alt+Backspace
+quits. If that all works, skip to step 5 for the frame rates.
+
+The careful version
+===================
+Step 1. Does the binary run? The console is never touched here.
+     /root/fbdoom2 -iwad /nonexistent.wad
+It should print "IWAD file '/nonexistent.wad' not found!" and return to the prompt at
+once.
+
+Step 2. Hands off: v1's drawing code, no mouse, ended by a timer.
+     (sleep 20; killall fbdoom2) & /root/fbdoom2 -iwad /mnt/sd/doom1.wad -mb 4 -scaling 2 -nomouse
+Touch nothing. The title screen should appear at 640x400 as in v1. After 20 seconds the
+timer ends the game and the prompt should come back, with the keyboard working. The shell
+says "Terminated". Make the sleep longer if start-up takes more than 20 seconds.
+If the console is dead afterwards: power cycle and go back to v1.
+
+Step 3. Keys. The same line without the timer:
+     /root/fbdoom2 -iwad /mnt/sd/doom1.wad -mb 4 -scaling 2 -nomouse
+Esc opens the menu. Backspace should step back out of it and must not quit. Then hold
+Ctrl and Alt and press Backspace: the prompt should return at once, with a line like
+     fbdoom: 412 frames in 20.3 s (20.2 fps)
+If the combination does nothing, quit the old way: Esc, Quit Game, Y.
+Right Ctrl should fire and Right Alt should strafe.
+
+Step 4. Full screen.
+     /root/fbdoom2 -iwad /mnt/sd/doom1.wad -mb 4 -nomouse
+The picture should reach all four edges with nothing stray. Then try the same line with
+-aspect: a 640x480 picture with clean black bars left and right.
+Among the start-up lines, visible after you quit, there should be
+     I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+If it says "integer, write() path" instead, the frame buffer could not be mapped.
+
+Step 5. Frame rates. Run the timed demo three times and let each one finish by itself:
+     /root/fbdoom2 -iwad /mnt/sd/doom1.wad -mb 4 -nomouse -timedemo demo1 -scaling 2
+     /root/fbdoom2 -iwad /mnt/sd/doom1.wad -mb 4 -nomouse -timedemo demo1
+     /root/fbdoom2 -iwad /mnt/sd/doom1.wad -mb 4 -nomouse -timedemo demo1 -aspect
+Each should end with "timed N gametics in M realtics (F fps)" followed by the fbdoom
+line. Note the three rates. v1 gave 18, and -scaling 2 is v1's drawing code, so the first
+should be close to that. The default writes one and a half times as much memory, so
+expect it to be the slowest of the three.
+
+Step 6. Mouse. Plug it in before starting, and leave out -nomouse:
+     /root/fbdoom2 -iwad /mnt/sd/doom1.wad -mb 4
+Moving left and right should turn, the left button fire, the right button strafe. Add
+-novert if you do not want the mouse to walk you forwards and backwards.
+After you quit, the start-up lines should include
+     Using mouse on /dev/input/eventN (name of the mouse)
+If it says "No mouse found.", the output of these two commands would help:
+     ls /dev/input
+     cat /proc/bus/input/devices
+If turning skips or falls short, it helps to know which mouse it is.
+
+Step 7. Extras, in any order.
+* -showfps draws the frame rate in the bottom right corner after the first second. Does
+  it flicker? Is it readable on camera?
+* Quit a -timedemo early with Ctrl+Alt+Backspace. The "timed" line should still print.
+
+If something is wrong
+=====================
+* Picture wrong, console fine: -scaling 2 goes back to v1's drawing code.
+* Mouse wrong: -nomouse leaves it alone.
+* Anything else: /root/fbdoom is v1.
+
+Things that are known and expected
+==================================
+* Settings are not kept between runs (screen size, mouse sensitivity). This port has the
+  config file code compiled out. Saved games do work.
+* In the default mode the picture is stretched to the panel's 5:3 shape, and pixels are
+  2 or 3 panel pixels wide by turns. -aspect gives the true 4:3 shape with even columns.
+* If the game is killed by the kernel for running out of memory, nothing can put the
+  keyboard back, as in v1. Power cycle.

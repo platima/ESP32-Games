@@ -1,0 +1,203 @@
+run-tests.sh, 2026-10-06 23:57 UTC, WSL2 Debian, qemu-riscv32 version 7.2.17 (Debian 1:7.2+dfsg-7+deb12u13)
+source: fbDOOM 17280163 plus fbdoom-korvo-v2.patch, applied to a fresh clone
+
+== build ==
+built test_scaler, test_mouse, test_console
+
+== scaler: every byte against the reference, nothing written outside the picture ==
+PASS 800x480 0 0: 320x200 -> 800x480 at (0,0), fill, 3 frames checked
+PASS 800x480 0 0 -aspect: 320x200 -> 640x480 at (80,0), aspect, 3 frames checked
+PASS 800x480 0 0 -scaling 2: 320x200 -> 640x400 at (80,40), integer, 3 frames checked
+PASS 240x240 0 0: 320x200 -> 240x240 at (0,0), fill, 3 frames checked
+PASS 240x240 0 0 -aspect: 320x200 -> 240x180 at (0,30), aspect, 3 frames checked
+PASS 320x200 0 0: 320x200 -> 320x200 at (0,0), fill, 3 frames checked
+PASS 1024x600 0 0: 320x200 -> 1024x600 at (0,0), fill, 3 frames checked
+PASS 800x480 0 0 -scaling 1: 320x200 -> 320x200 at (240,140), integer, 3 frames checked
+PASS 1024x600 0 0 -scaling 3: 320x200 -> 960x600 at (32,0), integer, 3 frames checked
+PASS 800x480 0 0 -scaling 3: 320x200 -> 800x480 at (0,0), fill, 3 frames checked
+PASS 800x480 0 0 -scaling 0: 320x200 -> 800x480 at (0,0), fill, 3 frames checked
+PASS 800x480 0 0 -scaling -1: 320x200 -> 800x480 at (0,0), fill, 3 frames checked
+PASS 800x200 0 0: 320x200 -> 800x200 at (0,0), fill, 3 frames checked
+PASS 800x300 0 0: 320x200 -> 800x300 at (0,0), fill, 3 frames checked
+PASS 800x600 0 0: 320x200 -> 800x600 at (0,0), fill, 3 frames checked
+PASS 800x1000 0 0: 320x200 -> 800x1000 at (0,0), fill, 3 frames checked
+PASS 640x200 0 0: 320x200 -> 640x200 at (0,0), fill, 3 frames checked
+PASS 640x400 0 0: 320x200 -> 640x400 at (0,0), fill, 3 frames checked
+PASS 640x600 0 0: 320x200 -> 640x600 at (0,0), fill, 3 frames checked
+PASS 640x1000 0 0: 320x200 -> 640x1000 at (0,0), fill, 3 frames checked
+PASS 800x480 64 4096: 320x200 -> 800x480 at (0,0), fill, 3 frames checked
+PASS 800x480 2 0: 320x200 -> 800x480 at (0,0), fill, 3 frames checked
+PASS 802x480 0 0 -aspect: 320x200 -> 640x480 at (81,0), aspect, 3 frames checked
+PASS 802x600 0 0 -aspect: 320x200 -> 800x600 at (1,0), aspect, 3 frames checked
+PASS 801x480 0 0: 320x200 -> 801x480 at (0,0), fill, 3 frames checked
+PASS 801x481 2 6 -aspect: 320x200 -> 641x481 at (80,0), aspect, 3 frames checked
+PASS 1280x720 0 0 -aspect: 320x200 -> 960x720 at (160,0), aspect, 3 frames checked
+PASS 1600x1200 0 0: 320x200 -> 1600x1200 at (0,0), fill, 3 frames checked
+PASS 160x100 0 0: 320x200 -> 160x100 at (0,0), fill, 3 frames checked
+PASS 100x75 0 0: 320x200 -> 100x75 at (0,0), fill, 3 frames checked
+PASS 64x48 0 0 -aspect: 320x200 -> 64x48 at (0,0), aspect, 3 frames checked
+PASS 800x480 0 0 -rgb555: 320x200 -> 800x480 at (0,0), fill, 3 frames checked
+PASS 800x480 0 0 -showfps -fpsval 23: 320x200 -> 800x480 at (0,0), fill, 3 frames checked
+PASS 800x480 0 0 -aspect -showfps -fpsval 7: 320x200 -> 640x480 at (80,0), aspect, 3 frames checked
+PASS 800x480 0 0 -scaling 2 -showfps -fpsval 135: 320x200 -> 640x400 at (80,40), integer, 3 frames checked
+PASS 800x480 0 0 -scaling 1 -showfps -fpsval 999: 320x200 -> 320x200 at (240,140), integer, 3 frames checked
+PASS 240x240 0 0 -aspect -showfps -fpsval 35: 320x200 -> 240x180 at (0,30), aspect, 3 frames checked
+PASS 320x200 0 0 -showfps -fpsval 1234: 320x200 -> 320x200 at (0,0), fill, 3 frames checked
+PASS 801x480 0 0 -showfps -fpsval 60: 320x200 -> 801x480 at (0,0), fill, 3 frames checked
+PASS 24x12 0 0 -showfps -fpsval 88: 320x200 -> 24x12 at (0,0), fill, 3 frames checked
+PASS 8x6 0 0 -showfps -fpsval 88: 320x200 -> 8x6 at (0,0), fill, 3 frames checked
+PASS 800x480 0 0 -showfps -runms 1300: 320x200 -> 800x480 at (0,0), fill, 3 frames checked
+PASS 800x480 0 0 -nommap: 320x200 -> 640x400 at (80,40), integer by write(), 3 frames checked
+PASS 800x480 0 0 -nommap -showfps -fpsval 23: 320x200 -> 640x400 at (80,40), integer by write(), 3 frames checked
+PASS 800x480 0 0 -bpp 32: 320x200 -> 640x400 at (80,40), integer by write(), 3 frames checked
+PASS 800x480 0 0 -bpp 32 -nommap: 320x200 -> 640x400 at (80,40), integer by write(), 3 frames checked
+PASS 800x480 0 0 -misalign 2: 320x200 -> 640x400 at (80,40), integer by write(), 3 frames checked
+PASS 800x480 0 0 -misalign 1 -scaling 2: 320x200 -> 640x400 at (80,40), integer by write(), 3 frames checked
+PASS 800x480 0 0 -failmalloc 1: 320x200 -> 640x400 at (80,40), integer, 3 frames checked
+PASS 800x480 0 0 -failmalloc 2: 320x200 -> 640x400 at (80,40), integer, 3 frames checked
+PASS 240x240 0 0 -failmalloc 1: stopped with an error, nothing can be drawn
+PASS 100x75 0 0 -nommap: stopped with an error, nothing can be drawn
+PASS 160x100 0 0 -bpp 32: stopped with an error, nothing can be drawn
+
+== the exit line and the -showfps number, with a clock that the test sets ==
+PASS 64x48 0 0 -noframes: no frames drawn
+PASS 64x48 0 0 -frames 1 -exitline fbdoom: 1 frame: 320x200 -> 64x48 at (0,0), fill, 1 frames checked
+PASS 64x48 0 0 -frames 2 -step 0 -exitline fbdoom: 2 frames: 320x200 -> 64x48 at (0,0), fill, 2 frames checked
+PASS 64x48 0 0 -frames 3 -step 10000 -exitline fbdoom: 3 frames in 0.0 s (100.0 fps): 320x200 -> 64x48 at (0,0), fill, 3 frames checked
+PASS 64x48 0 0 -frames 2 -step 999000 -exitline fbdoom: 2 frames in 1.0 s (1.0 fps): 320x200 -> 64x48 at (0,0), fill, 2 frames checked
+PASS 64x48 0 0 -frames 36 -step 28571 -showfps -shown 35 -exitline fbdoom: 36 frames in 1.0 s (35.0 fps): 320x200 -> 64x48 at (0,0), fill, 36 frames checked
+PASS 64x48 0 0 -frames 9 -step 250000 -showfps -shown 4 4 -exitline fbdoom: 9 frames in 2.0 s (4.0 fps): 320x200 -> 64x48 at (0,0), fill, 9 frames checked
+PASS 64x48 0 0 -frames 100 -step 45700 -showfps -shown 22 22 22 22 -exitline fbdoom: 100 frames in 4.5 s (21.9 fps): 320x200 -> 64x48 at (0,0), fill, 100 frames checked
+PASS 64x48 0 0 -frames 3121 -step 45700 -exitline fbdoom: 3121 frames in 142.6 s (21.9 fps): 320x200 -> 64x48 at (0,0), fill, 3121 frames checked
+PASS  3 frames, real clock: fbdoom: 3 frames in 0.5 s (4.3 fps)
+
+== the scaler test must fail when the scaler is broken ==
+PASS  xmap samples the left edge, not the centre: caught (frame 0: (2,0) is 0xb99d, should be 0x5420)
+PASS  ymap samples the top edge, not the centre: caught (frame 0: (0,2) is 0xb99d, should be 0xfe41)
+PASS  xmap loop: the two pixels of a store swapped: caught (frame 0: (2,0) is 0x923, should be 0x24a7)
+PASS  xmap loop: the second row of a group not written: caught (frame 0: (0,1) is 0xaddd, should be 0x24a7)
+PASS  xmap loop: the third row of a group not written: caught (frame 0: (0,2) is 0x8abb, should be 0x24a7)
+PASS  640 loop: the wrong source pixel: caught (frame 0: (80,0) is 0x5420, should be 0xb99d)
+PASS  640 loop: the second row of a group not written: caught (frame 0: (80,1) is 0xadde, should be 0xb99d)
+PASS  640 loop: the third row of a group not written: caught (frame 0: (80,4) is 0xf5a6, should be 0xfe41)
+PASS  800 loop: two of the five stores the wrong way round: caught (frame 0: (4,0) is 0x9311, should be 0x5420)
+PASS  800 loop: the two pixels of the middle store swapped: caught (frame 0: (4,0) is 0x9311, should be 0x5420)
+PASS  800 loop: the second row of a group not written: caught (frame 0: (0,1) is 0xbced, should be 0xb99d)
+PASS  800 loop: the third row of a group not written: caught (frame 0: (0,4) is 0x84b5, should be 0xfe41)
+PASS  the 800 loop used for a width it does not suit: caught (frame 0: (2,0) is 0x923, should be 0x24a7)
+PASS  the 640 loop used for a width it does not suit: caught (frame 0: (4,0) is 0x9311, should be 0x5420)
+PASS  a group of two rows drawn as one: caught (frame 0: (0,1) is 0xbced, should be 0xb99d)
+PASS  a group of three rows drawn as two: caught (frame 0: (80,4) is 0xf5a6, should be 0xfe41)
+PASS  the fourth row of a group not copied: caught (frame 0: (160,3) is 0xf1a2, should be 0xd465)
+PASS  a copied row one pixel short: caught (frame 0: (800,1) is 0xc8f8, should be 0x7247)
+PASS  a copied row one pixel too long: caught (frame 0: (1120,3), outside the picture, is 0x81b2, should be 0xc1f2)
+PASS  the 16-bit loop writes one pixel too many: caught (frame 0: (721,0), outside the picture, is 0x4447, should be 0xe99a)
+PASS  a mapping that is not word aligned is drawn in: caught (chose 800x480 at (0,0) mode 2, expected 640x400 at (80,40) integer by write())
+PASS  a screen that nothing can be drawn on is left black: caught (carried on with a screen that nothing can be drawn on)
+PASS  the fps box one pixel too far right: caught (frame 0: guard byte 0 after the mapping overwritten)
+PASS  the fps box one row too tall: caught (frame 0: (668,440), outside the picture, is 0x0, should be 0x9ecf)
+PASS  a wrong bit in the digit 3: caught (frame 0: (790,465) is 0x0, should be 0xffff)
+PASS  the exit line counts the first frame as well as the time before it: caught (the exit line should be "fbdoom: 36 frames in 1.0 s (35.0 fps)")
+PASS  so does the first number on the screen: caught (-showfps worked out: 5 4)
+PASS  a single frame gets a frame rate: caught (the exit line should be "fbdoom: 1 frame")
+PASS  the mouse is not read before the blit: caught (frame 0: I_PollMouse called 1 times, 1 of them at the wrong moment; it should be once before the blit and once after)
+PASS  the mouse is not read after the blit: caught (frame 0: I_PollMouse called 1 times, 0 of them at the wrong moment; it should be once before the blit and once after)
+PASS  the mouse is not read after the blit, write() path: caught (frame 0: I_PollMouse called 1 times, 0 of them at the wrong moment; it should be once before the blit and once after)
+
+== mouse: synthetic events through pipes ==
+PASS  test_mouse: 75 checks
+sizeof(struct kernel_input_event) = 16, sizeof(struct input_event) = 16, sizeof(long) = 4
+PASS  movement is not held to a limit: caught (posted buttons 0, x 12, y 0; wanted 0, -65524, 0)
+PASS  movement is posted twice: caught (nothing new: nothing posted)
+PASS  every read is followed by another: caught (I_PollMouse reads what is waiting, with one read(), and posts nothing)
+PASS  movement to the left or forwards is not accelerated: caught (posted buttons 0, x -11, y 0; wanted 0, -12, 0)
+
+== console: start-up, keys and every way out, against a fake VT ==
+PASS test_console timedemo-quit (status 255)
+PASS test_console timedemo-end (status 255)
+PASS test_console play-quit (status 0)
+PASS test_console play-quit-right (status 0)
+PASS test_console play-quit-mixed (status 0)
+PASS test_console play-quit-media (status 0)
+PASS test_console keys (status 0)
+PASS test_console noframes (status 0)
+PASS test_console error-early (status 255)
+PASS test_console error-unread (status 255)
+PASS test_console exit (status 3)
+PASS test_console kbmode-fails (status 0)
+PASS test_console tcgetattr-fails (status 0)
+PASS test_console null-store (status -11)
+PASS test_console abort (status -6)
+PASS test_console stack-overflow (status -11)
+PASS test_console segv (status -11)
+PASS test_console sigbus (status -7)
+PASS test_console sigill (status -4)
+PASS test_console sigfpe (status -8)
+PASS test_console sigabrt (status -6)
+PASS test_console sigterm (status -15)
+PASS test_console sighup (status -1)
+PASS test_console sigint (status -2)
+PASS test_console sigquit (status -3)
+PASS test_console sigpipe (status -13)
+PASS test_console sigalrm (status -14)
+PASS test_console sigusr1 (status -10)
+PASS test_console sigusr2 (status -12)
+
+== the console test must fail when a way out is left unguarded ==
+PASS  no atexit() handler: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  kbd_shutdown does not put the VT back: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  the terminal settings are written back without having been read: caught ("[vt] afterwards: KD_TEXT, keyboard mode as it was, termios as it was" is missing, or out of order)
+PASS  unread key bytes are left for the shell: caught ("[vt] tcflush: 4 unread key bytes dropped" is missing, or out of order)
+PASS  the handler has no stack of its own: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  the bytes of a keycode above 127 are read as keys: caught (status 99, expected 0)
+PASS  Backspace alone quits, as in v1: caught ("[event] keydown 0x7f" is missing, or out of order)
+PASS  SIGSEGV is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  SIGBUS is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  SIGILL is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  SIGFPE is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  SIGABRT is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  SIGTERM is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  SIGHUP is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  SIGINT is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  SIGQUIT is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  SIGPIPE is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  SIGALRM is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  SIGUSR1 is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  SIGUSR2 is not caught: caught ("[vt] KDSKBMODE as it was" is missing, or out of order)
+PASS  I_Quit runs the exit functions before the VT is back in text mode: caught ("[exit function] M_SaveDefaults" is missing, or out of order)
+PASS  I_Error prints before the VT is back in text mode: caught ("timed 3 gametics in 1 realtics (105.000000 fps)" is missing, or out of order)
+
+== preview images, through the same scaler ==
+PASS  preview-fill.png (320x200 -> 800x480 at (0,0), fill)
+PASS  preview-aspect.png (320x200 -> 640x480 at (80,0), aspect)
+PASS  preview-scaling2.png (320x200 -> 640x400 at (80,40), integer)
+
+== the binary itself, with no WAD ==
+PASS  no-arguments: exits with status 255
+    | Starting D_DoomMain
+    | Game mode indeterminate.  No IWAD file was found.  Try
+    | specifying one with the '-iwad' command line parameter.
+    | 
+    | 
+    |                                FDoom 0.1
+    | Z_Init: Init zone memory allocation daemon. 
+    | zone memory: 0x3f9fd030, 600000 allocated for zone
+    | Using /mnt/.fdoom.tar/ for configuration and saves
+    | V_Init: allocate screens.
+    | M_LoadDefaults: Load system defaults.
+    | saving config in /mnt/.fdoom.tar/default.cfg
+PASS  missing-iwad: exits with status 255
+    | Starting D_DoomMain
+    | IWAD file '/nonexistent/doom1.wad' not found!
+    | 
+    |                                FDoom 0.1
+    | Z_Init: Init zone memory allocation daemon. 
+    | zone memory: 0x3f9fd030, 600000 allocated for zone
+    | Using /mnt/.fdoom.tar/ for configuration and saves
+    | V_Init: allocate screens.
+    | M_LoadDefaults: Load system defaults.
+    | saving config in /mnt/.fdoom.tar/default.cfg
+    f92c004690995d52a8ee0eb2d0a4844403037e22149df8e5997fea0fde82b3aa  /mnt/d/Repos/esp32-s31-linux-release/doom-prototype/v2/tests/../fbdoom-korvo
+
+== 155 passed, 0 failed ==
+exit status of run-tests.sh: 0

@@ -1,0 +1,340 @@
+fbDOOM v2 for the ESP32-S31-Korvo-1 (esp32-s31-linux be5b725)
+=============================================================
+
+Status
+======
+v1 (in ../v1) has run on the board: 18 fps in -timedemo demo1.
+
+v2 has NOT run on the board. It has been built with the board toolchain, and its new code
+has been tested under qemu-riscv32-static against a fake frame buffer, a fake VT and fake
+mice. Nothing in this file about how v2 looks, feels or performs on the panel has been
+seen on hardware. The list of what is still to be confirmed is at the end.
+
+Files
+=====
+fbdoom-korvo-v2         429,496 bytes  static RV32 musl soft-float, fbDOOM plus the v2 patch
+fbdoom-korvo-v2.patch    36,050 bytes  one patch against fbDOOM 17280163: v1 and v2 together
+preview-fill.png        a test card through the new scaler: the default, with -showfps
+preview-aspect.png      the same test card with -aspect
+preview-scaling2.png    the same test card with -scaling 2, which is the v1 picture
+tests/                  test sources, run-tests.sh, and the results of the last run
+TEST-PLAN.txt           what to try on the board, safest steps first
+BUILD.txt               this file
+
+The binary is not kept in this repository. Build it as described below.
+
+SHA-256 of the binary:
+f92c004690995d52a8ee0eb2d0a4844403037e22149df8e5997fea0fde82b3aa  fbdoom-korvo-v2
+
+The preview images are 800x480, one pixel for each panel pixel. They show where each mode
+puts the picture and how the scaler repeats pixels. The circle on the card is drawn to be
+round on a 4:3 screen, so it is round with -aspect and wide in the default mode.
+
+What changed since v1
+=====================
+* Full screen. The picture now fills the 800x480 panel by default. v1 only scaled by
+  whole numbers, which gave 640x400 with a black border.
+* -aspect gives the largest 4:3 picture that fits: 640x480, centred, black bars left and
+  right.
+* -scaling N still gives whole number scaling, with v1's code. -scaling 2 is the v1
+  picture exactly. A factor that does not fit the screen is now ignored, with a message.
+  v1 would have written past the end of its buffer.
+* USB mouse, read from /dev/input/eventN.
+* Backspace no longer quits. It is an ordinary key again (back one level in the menus).
+  Ctrl+Alt+Backspace quits at once.
+* Right Ctrl and Right Alt now work, the same as the left ones.
+* A line with the frame count and rate is printed on the way out, and -showfps draws the
+  rate on the screen.
+* The console is put back in text mode before anything is printed on the way out, so the
+  -timedemo result and error messages can be read. See "-timedemo" below.
+* The console is put back in more cases. v1 did it on exit and for SIGSEGV, SIGBUS,
+  SIGILL, SIGFPE, SIGABRT, SIGTERM and SIGHUP. v2 adds SIGINT, SIGQUIT, SIGPIPE, SIGALRM,
+  SIGUSR1 and SIGUSR2, and a crash caused by the stack running out. So "kill -INT", or
+  Ctrl+C in an ssh session that the game was started from, should no longer leave the
+  panel console dead.
+* Key presses that the game had not read yet are thrown away on the way out. Before, the
+  shell could get them as typed characters.
+* Keys with a keycode above 127 (some multimedia keys) are ignored. v1 took each of them
+  for two other keys being let go, Esc among them.
+
+Command line
+============
+/root/fbdoom2 -iwad /mnt/sd/doom1.wad -mb 4 [options]
+
+-mb N        zone (Doom's heap) in MiB, as in v1. Default 6.
+(no option)  fill the screen: 320x200 to 800x480.
+-aspect      4:3 picture, 640x480, centred.
+-scaling N   whole number scaling, centred: N can be 1 or 2 on this panel. Wins over
+             -aspect if both are given.
+-showfps     draw the frames per second in the bottom right corner of the picture,
+             white on black, updated once a second. Nothing is shown for the first
+             second.
+-nomouse     do not look for a mouse.
+-novert      ignore forward and backward mouse movement. The mouse then cannot move the
+             menu selection up and down either: use the arrow keys there.
+-timedemo demo1   play demo1 as fast as it will go, print the result and exit.
+
+At start-up one line says what was chosen, for example:
+  I_InitGraphics: 320x200 -> 800x480 at (0,0), fill
+The older line "Auto-scaling factor: 2" is still printed above it. It only matters with
+-scaling, or if the frame buffer could not be mapped.
+
+Keys
+====
+Arrows                  move and turn
+Left Ctrl, Right Ctrl   fire
+Left Alt, Right Alt     strafe (hold, with the left and right arrows)
+Space                   open doors, use
+Shift                   run
+Esc                     menu
+Enter, Y                select, confirm
+Backspace               back one level in the menus. It does not quit any more.
+Ctrl+Alt+Backspace      quit at once, from anywhere. Either Ctrl with either Alt.
+
+Ctrl+Alt+Backspace goes through Doom's own exit code, the same as Quit Game in the menu:
+the console is put back, the exit handlers run, and the frame rate line is printed.
+Ctrl+C on the panel keyboard still does nothing while the game is running.
+
+Settings are not kept between runs, in v1 or v2. v1's notes said that quitting from the
+menu kept them. That was wrong: this port has the config file code compiled out
+(config.h undefines ORIGCODE, which empties SaveDefaultCollection and
+LoadDefaultCollection in m_config.c). Screen size, mouse sensitivity and the rest start
+from the defaults every time. Saved games are separate and go in /mnt/.fdoom.tar/savegame/.
+
+Mouse
+=====
+At start-up fbDOOM looks at /dev/input/event0 to event31 and uses up to four devices that
+report relative X and Y movement and have a left button. It prints one line for each:
+  Using mouse on /dev/input/event1 (name of the mouse)
+or "No mouse found." These lines scroll past when the game takes over the screen. They
+are on the console again after you quit.
+
+Left and right movement turns. Forward and backward movement walks, as in the original
+game; -novert turns that off. Left button fires. Right button strafes while held. Middle
+button walks forward. A double click of the right or middle button is "use". In the menus
+the mouse moves the selection, the left button selects and the right button goes back.
+
+Sensitivity is in the Options menu (it is not saved, see above). Fast movement is
+doubled beyond 10 counts per reading, as Chocolate Doom does by default.
+
+The mouse has to be plugged in before fbDOOM starts. One that is unplugged while playing
+is dropped and the game carries on, but it is not looked for again: if a mouse drops off
+the bus and comes back (a loose plug, a hub that resets), it stays dead until the game is
+restarted. It needs read access to /dev/input/event*, so run it as root, as before.
+
+A very fast mouse may skip. The kernel keeps a limited number of events for each device
+(128 for an ordinary mouse with this kernel) and throws all of them away when that fills
+up. fbDOOM empties the queue once every game tic and on both sides of drawing each frame.
+A gaming mouse that reports 1000 times a second can fill the queue in about 43 ms of
+fast diagonal movement, and at this frame rate that may still happen now and then. It
+would show as turning that skips or falls short. A plain mouse that reports 125 times a
+second needs about a third of a second to fill it and should be fine. All of this is
+worked out from the kernel source, not seen with a real mouse. If the mouse feels wrong,
+it helps to know which kind it was.
+
+v1 read no mouse at all: it only read keys from the VT. That is why the mouse did
+nothing, not a fault in the mouse.
+
+Frame rate
+==========
+Every run that got as far as drawing ends with a line such as
+  fbdoom: 3120 frames in 142.6 s (21.9 fps)
+It counts every frame put on the screen, menus and title screen included. The time runs
+from the first frame to the last, and the rate is the frames after the first one over
+that time. In normal play Doom draws at most 35 frames a second, so this number tops out
+at 35.0. After a single frame there is no rate to give, and the line is "fbdoom: 1 frame".
+
+It is printed for Ctrl+Alt+Backspace, for Quit Game and for errors once the game has
+started drawing. Nothing is printed when no frame was drawn (a missing WAD, for example),
+or when the program is killed by a signal.
+
+-timedemo
+=========
+  /root/fbdoom2 -iwad /mnt/sd/doom1.wad -mb 4 -timedemo demo1
+plays the demo with one frame for every game tic and no speed limit, then prints
+  timed N gametics in M realtics (F fps)
+and exits with status 255 (that is how Doom ends a timed demo). A realtic is 1/35 s.
+It prints the same line if you leave early with Ctrl+Alt+Backspace or Quit Game.
+
+Why this seemed to do nothing in v1: the demo did play, and it looks just like the demo
+that runs behind the title screen. Leaving with Backspace skipped Doom's exit handlers,
+so no result was printed. When the demo ran to its end, the result was printed while the
+VT was still in graphics mode. In that mode fbcon keeps the text but does not scroll, so
+the line would have sat on the bottom row, with the shell prompt then written over its
+start. That last part is worked out from the kernel source, not seen on the panel.
+
+To compare the three modes on the board, run the timedemo line above three times: as it
+is, with -aspect, and with -scaling 2. The last one is v1's drawing code.
+
+What drawing one frame costs in each mode. These are counts, not times: the drawing code
+was run under qemu one instruction at a time. Nothing here was timed on the board.
+
+  mode          pixels     32-bit stores   instructions   loads
+  v1            256,000    128,000         706,871        128,421
+  -scaling 2    256,000    128,000         706,920        128,436
+  -aspect       307,200    153,600         765,167        129,517
+  default       384,000    192,000         656,207        129,517
+
+So the default mode runs about as many instructions as v1 did, and writes one and a half
+times as much memory. All of this memory is write-through, so the extra stores are what
+should make it slower than v1, and -scaling 2 should still be the quickest. By how much
+is not known yet. -showfps adds about 1,600 16-bit stores a frame for its box.
+
+Source
+======
+https://github.com/maximevince/fbDOOM
+commit 17280163bc95e5d954d2efaa0633489b763b4cd1 (2026-04-10)
+
+Toolchain
+=========
+The board's own Buildroot 2026.08 toolchain: GCC 15.3.0, riscv32-buildroot-linux-musl,
+musl 1.2.6, rv32imac, ilp32 (soft-float). It is used by absolute path from the finished
+build in ~/esp32-s31-linux-main. Nothing in that tree was changed.
+
+Build (WSL2 Debian)
+===================
+M=$HOME/esp32-s31-linux-main/build/br-output
+git clone https://github.com/maximevince/fbDOOM
+cd fbDOOM
+git checkout 17280163bc95e5d954d2efaa0633489b763b4cd1
+git apply --check /path/to/fbdoom-korvo-v2.patch
+git apply /path/to/fbdoom-korvo-v2.patch
+cd fbdoom
+CFLAGS="-std=gnu11" LDFLAGS="-static" make -j8 NOSDL=1 CROSS_COMPILE=$M/host/bin/riscv32-buildroot-linux-musl-
+$M/host/bin/riscv32-buildroot-linux-musl-strip -o fbdoom-korvo-v2 fbdoom
+
+The patch is against the unmodified source. Do not apply v1's patch first. Built this way
+from a fresh clone, the binary came out byte for byte the same as the one here.
+
+The flags are the same as for v1: -std=gnu11 because GCC 15 defaults to C23 and
+doomtype.h declares "false" in an enum; NOSDL=1 because the Makefile would otherwise link
+-lSDL; -static because the sysroot has musl's libc.a. Give CFLAGS and LDFLAGS in the
+environment, not as make arguments.
+
+Something to try later: the binary is built for plain rv32imac, and the board's device
+tree also lists the Zba, Zbb and Zbs extensions. With them the compiler can do each table
+lookup in one instruction fewer; for the drawing code alone that came to between 8 and 15
+per cent fewer instructions under qemu, depending on the mode. What it does for the rest
+of the game was not measured. It has not been tried on the board and it is not in the
+binary here. To try it, check that /proc/cpuinfo on the board lists zba, zbb and zbs,
+then build with
+  CFLAGS="-std=gnu11 -march=rv32imac_zba_zbb_zbs -mabi=ilp32"
+in place of CFLAGS="-std=gnu11", and compare -timedemo demo1 with and without. That
+build links and starts under qemu. Without the extensions it stops with "Illegal
+instruction": under qemu that was at once, before the console had been touched, and
+SIGILL is one of the signals that put the console back in any case.
+
+What the patch changes (883 lines added, 24 removed, six files)
+===============================================================
+i_video_fbdev.c        v1: maps /dev/fb0 and draws into it at 16 bpp, clears the screen
+                       once. v2: a scaler for any size, up or down, driven by two small
+                       tables built at start-up, with row loops of their own for 640
+                       and 800 across; the choice of mode; the frame counter, the exit
+                       line and the -showfps box; reads the mouse before and after
+                       drawing.
+i_input_evdev_mouse.c  New. Finds the mice, reads their events without blocking, posts
+                       Doom mouse events.
+i_input_tty.c          v1: puts the VT back (keyboard mode, termios, text mode) on every
+                       exit and on crash signals; KD_GRAPHICS while playing. v2: the
+                       Ctrl+Alt+Backspace quit, Right Ctrl and Right Alt, the mouse hooks,
+                       KD_GRAPHICS set after the last start-up message, six more signals
+                       and a stack of its own for the handler, unread keys thrown away
+                       on the way out, three byte keycodes skipped.
+i_input_tty.h          Prototypes for the above.
+i_system.c             v1: I_Error and I_Quit exit, where the stock code spins for ever.
+                       v2: both put the VT back first, before anything is printed.
+Makefile               Adds the new file.
+
+The scaler samples the source at the centre of each destination pixel (nearest
+neighbour). It writes straight into the mapped frame buffer with aligned 16-bit or 32-bit
+stores. Rows that show the same source row are written together or copied. It never
+writes outside the visible screen or the mapping. The row loops for 640 and 800 across
+are only used when the column table agrees with them entry for entry, so they draw what
+the table would. If the frame buffer is not 16 bpp or cannot be mapped, or the tables
+cannot be allocated, it falls back to v1's whole number scaling. On a screen smaller
+than 320x200 that fallback has nothing to draw, so there the game stops with a message
+instead of running with a black screen.
+
+Tests (under qemu-riscv32-static, not on the board)
+===================================================
+bash tests/run-tests.sh
+
+It rebuilds the tests with the board toolchain and runs them. SRC points it at the
+patched fbdoom directory and M at the Buildroot output; the defaults are at the top of
+the script. The last run is in tests/results.txt: 155 checks, all passed.
+
+* test_scaler.c runs the real I_InitGraphics and I_FinishUpdate against a frame buffer
+  in memory. Before each frame the whole frame buffer is filled with a pattern that has
+  no zero byte in it. After the frame the picture has to match a reference written
+  separately, pixel for pixel, and every other byte has to hold the pattern still: the
+  border, the padding at the end of each line, whatever follows the last line, and guard
+  zones either side of the mapping. It does this with random frames and palettes for 53
+  combinations of screen size and options. These include 800x480 (default, -aspect,
+  -scaling 2), 240x240 (default, -aspect), 320x200 and 1024x600, each row loop with 1, 2,
+  3 and 5 screen rows to a source row, odd sizes and offsets, line padding, another
+  16 bpp layout, the fallback paths, and three small screens where it has to stop with
+  an error.
+* Ten more runs use a clock that the test sets, and check the exit line word for word
+  and the numbers that -showfps works out: 36 frames 1/35 s apart have to give 35.0 fps,
+  for one.
+* The same test is then built 31 times against a copy of the source with one thing
+  broken (a table, a store in each row loop, a copied row, the choice of loop, the
+  -showfps box, the frame rate sums, the mouse calls around the drawing). Each broken
+  copy has to build, run and fail, and does.
+* test_mouse.c feeds events through pipes, built byte by byte in the kernel's layout: 75
+  checks. Movement adding up, acceleration either side of the threshold and for negative
+  values, values far beyond what a mouse sends (the largest and smallest 32-bit numbers),
+  buttons, -novert, an event split across two reads, reading between tics without
+  posting, how many times read() is called, a device that goes away, a read error, and
+  the scan for devices against fake ones. Four broken copies have to fail.
+* test_console.c runs the real start-up, key and exit code against a fake VT, one way
+  out at a time, 29 in all: Ctrl+Alt+Backspace with each pair of Ctrl and Alt keys, in
+  play and in a timed demo, and with a multimedia key pressed in between; a timed demo
+  running to its end; Quit Game; an error before start-up and one in the middle of a
+  game with keys still unread; a plain exit(); start-up failing at two points; a store
+  through a null pointer, abort() and a stack overflow; and each of the thirteen signals.
+  It checks that the keyboard mode, termios and text mode are put back each time (the
+  state of the fake VT is read after the game has gone), that this happens before the
+  result or the error is printed, that the frame rate line comes after it, and that plain
+  Backspace and other near misses do not quit. 22 broken copies have to fail: no atexit
+  handler, each signal left out in turn, and so on.
+* The binary itself is started with no WAD and with a missing -iwad. Both times it prints
+  the error and exits with status 255, as v1 does.
+
+Not yet checked on the board
+============================
+* How the default and -aspect pictures look on the panel.
+* The frame rate of each mode. Nothing here was timed on hardware.
+* The mouse. Finding a real mouse, and reading its events from the real kernel, have
+  only been tested against fakes. Whether the turning speed feels right is unknown, and
+  so is whether a fast mouse skips.
+* Ctrl+Alt+Backspace and Right Ctrl and Right Alt on the real keyboard. That multimedia
+  keys arrive as three bytes comes from the kernel source; none has been pressed.
+* That the lines printed on the way out appear cleanly on the panel. The reason for
+  putting the VT back first comes from reading the kernel source (fbcon does not scroll in
+  graphics mode), not from seeing it happen.
+* The extra signals, the handler's own stack and the throwing away of unread keys. These
+  were tested against the fake VT only.
+* How readable the -showfps box is, and whether it flickers. It is redrawn right after
+  the bottom rows of each frame, and there is no vsync.
+
+Running it on the board
+=======================
+TEST-PLAN.txt has the steps in a careful order. In short:
+
+1. Copy fbdoom-korvo-v2 onto the FAT partition (KORVO_SD), next to doom1.wad. The board
+   mounts it at /mnt/sd. v1 is called fbdoom-korvo, so the two do not clash.
+2. Plug in the keyboard and the mouse.
+3. On the panel shell (tty1):
+     cp /mnt/sd/fbdoom-korvo-v2 /root/fbdoom2
+     chmod +x /root/fbdoom2
+     /root/fbdoom2 -iwad /mnt/sd/doom1.wad -mb 4
+   This installs v2 as /root/fbdoom2 and leaves v1 at /root/fbdoom, where it was.
+4. If it stops with "Z_Malloc: failed on allocation", try -mb 5.
+5. If the new picture is wrong in any way, -scaling 2 goes back to v1's drawing code and
+   -nomouse leaves the mouse alone. For anything else, /root/fbdoom is still v1.
+
+Run it from the panel shell. It reads keys from the VT in raw mode. If it is killed with
+SIGKILL (for example by the OOM killer), nothing can put the keyboard back, and the panel
+console stays unusable until a reboot. Use ssh or the UART to recover, or power cycle.
+This is unchanged from v1.

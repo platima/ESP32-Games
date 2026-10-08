@@ -1,0 +1,102 @@
+fbDOOM for the ESP32-S31-Korvo-1 (esp32-s31-linux be5b725)
+==========================================================
+
+Files
+=====
+fbdoom-korvo         421,304 bytes  static RV32 musl soft-float, fbDOOM plus fbdoom-korvo.patch (use this)
+fbdoom-stock         421,296 bytes  static, unmodified fbDOOM source (one compiler flag only)
+fbdoom-korvo.patch     6,710 bytes  the source changes, against fbDOOM 17280163
+test_blit.c            2,704 bytes  checks the new blit against the original one under qemu
+BUILD.txt                           this file
+
+SHA-256
+8f89edfeb5c8933eb0d824e68cd73b0634c41e1ed5a18cfa88737fbcfc99a1f0  fbdoom-korvo
+a13a0a8cb96a1874d17749020cba46b8275e16b934dde46c043b966792d231f0  fbdoom-stock
+1e623428ddb7fb63308351f87ba245dddec4837fc342aebe1313b474f5e9d225  fbdoom-korvo.patch
+
+fbdoom-korvo has run on the board: 18 fps in -timedemo demo1, with -mb 4. fbdoom-stock has
+only run under qemu-riscv32-static. The binaries are not kept in this repository.
+
+Source
+======
+https://github.com/maximevince/fbDOOM
+commit 17280163bc95e5d954d2efaa0633489b763b4cd1 (2026-04-10)
+
+Toolchain
+=========
+The board's own Buildroot 2026.08 toolchain: GCC 15.3.0, riscv32-buildroot-linux-musl,
+rv32imac, ilp32 (soft-float). It is used by absolute path from the finished build in
+~/esp32-s31-linux-main. Nothing in that tree was changed.
+
+Build (WSL2 Debian)
+===================
+M=$HOME/esp32-s31-linux-main/build/br-output
+git clone https://github.com/maximevince/fbDOOM
+cd fbDOOM
+git checkout 17280163bc95e5d954d2efaa0633489b763b4cd1
+git apply /path/to/fbdoom-korvo.patch          # leave this out for fbdoom-stock
+cd fbdoom
+CFLAGS="-std=gnu11" LDFLAGS="-static" make -j8 NOSDL=1 CROSS_COMPILE=$M/host/bin/riscv32-buildroot-linux-musl-
+$M/host/bin/riscv32-buildroot-linux-musl-strip -o fbdoom-korvo fbdoom
+
+About the flags:
+* -std=gnu11: GCC 15 defaults to C23, where "false" is a keyword, and doomtype.h
+  declares it in an enum. This is the only change the stock source needs.
+* NOSDL=1: otherwise the Makefile links -lSDL. fbDOOM does not use SDL and the board
+  has none.
+* -static: the sysroot has musl's libc.a. A dynamic build also works (interpreter
+  /lib/ld-musl-riscv32-sf.so.1, needs only libc.so) and is about 32 KB smaller.
+* Give CFLAGS and LDFLAGS in the environment, not as make arguments. The Makefile adds
+  to them with +=, and a make argument would replace -DNORMALUNIX -DLINUX.
+
+What the patch changes (111 lines added, 10 removed)
+=====================================================
+i_system.c       In the stock code, I_Error prints its message and then spins in a busy
+                 loop for ever. It now exits. I_Quit now exits too.
+i_input_tty.c    Puts the VT back (keyboard mode, termios, text mode) on every exit and
+                 on crash signals. Sets the VT to KD_GRAPHICS so that fbcon stops drawing
+                 its cursor and kernel messages over the game.
+i_video_fbdev.c  Maps /dev/fb0 and draws straight into it at 16 bpp through a palette
+                 table: one 32-bit store for every two pixels at 2x scale. Any other
+                 format uses the original write() path. Clears the screen once at start.
+
+Checked under qemu-riscv32-static (not on the board)
+====================================================
+* Both binaries start, print the banner and stop at the missing WAD.
+  Stock: prints the error, then spins at 100% CPU until it is killed.
+  Patched: prints the error and exits with status 255.
+* test_blit.c: the new blit gives a byte-identical frame buffer to the original path
+  at scale 1 and at scale 2 (random frame and palette).
+  Build: $M/host/bin/riscv32-buildroot-linux-musl-gcc -std=gnu11 -Os -DNORMALUNIX -DLINUX -static -I fbDOOM/fbdoom -o test_blit test_blit.c fbDOOM/fbdoom/build/tables.o
+  Run:   qemu-riscv32-static ./test_blit 20
+
+Running it on the board
+=======================
+1. Copy fbdoom-korvo and doom1.wad onto the FAT partition (KORVO_SD). The board mounts
+   it at /mnt/sd.
+2. On the panel shell, with the USB keyboard:
+     cp /mnt/sd/fbdoom-korvo /root/fbdoom
+     chmod +x /root/fbdoom
+     free
+     /root/fbdoom -iwad /mnt/sd/doom1.wad -mb 4
+3. -mb sets the zone (Doom's heap) in whole MiB. The default is 6. If it stops with
+   "Z_Malloc: failed on allocation", try -mb 5.
+4. Benchmark: /root/fbdoom -iwad /mnt/sd/doom1.wad -mb 4 -timedemo demo1
+   It ends with "timed N gametics in M realtics (F fps)" and exits. The stock binary
+   hangs at that point with the keyboard still in raw mode.
+   The demo plays as fast as the board can draw it, which takes a few minutes, and the
+   result shows on the console once the game has exited.
+
+The picture is 320x200 scaled 2x to 640x400, centred, with black borders.
+
+Keys: arrows move and turn, Left Ctrl fires, Space opens doors, Left Alt strafes, Shift
+runs, Esc opens the menu, Enter selects, Y confirms. Right Ctrl and Right Alt do nothing.
+Backspace quits at once, even inside a menu, so use Esc to back out of menus. Settings
+are not kept between runs: this port has the config file code compiled out. Saved games
+go in /mnt/.fdoom.tar/savegame/ (the path is hard coded). Ctrl+C does nothing once the
+game is running.
+
+Run it from the panel shell (tty1). It reads keys from the VT in raw mode, not from
+evdev. If it is killed with SIGKILL (for example by the OOM killer), nothing can put the
+keyboard back, and the panel console stays unusable until a reboot. Use ssh or the UART
+to recover, or power cycle.
