@@ -46,6 +46,8 @@ patches/Wolf4SDL-korvo.patch           against Wolf4SDL commit 51b3694
 build.sh                            fetches the sources, patches, builds
 tests/                              the fake console, the test programs, the last results
 tools/storecost.c                   times loads and stores on the board (see "Picture")
+tools/wolfbench.sh                  for the board: the timed demo in every picture mode,
+                                    and the frame rates in a table (see TEST-PLAN.txt)
 TEST-PLAN.txt                       what to try on the board, safest steps first
 BUILD.txt                           this file
 
@@ -254,7 +256,9 @@ By those two figures the rows that have not been timed come to
   first version, --resf 800 480            5.6     (6.2 measured, in play)
 
 These are worked out, not measured, and the timed demo includes a fade at its start
-that costs the faster modes a few in 100. What they say is plain enough: the two ways
+that costs the faster modes a few in 100. tools/wolfbench.sh is a script for the
+board that times every row in one go and writes the table down; it has run under the
+emulator only, with the board's own shell. What they say is plain enough: the two ways
 of filling the panel from a small picture give 25 frames a second or more, and
 drawing at the panel's own 800x480 does not come near. Every wall pixel drawn is a
 store and a handful of instructions, the walls at 800x480 are six times the pixels of
@@ -547,7 +551,8 @@ below has been reported yet, for either version.
 * How the picture modes look: whether anything is left behind when the view moves,
   the fades, the fizzle fade when the player dies.
 * The frame rates of --scale aspect, --resf 400 240, --res 640 400, --resf 800 480
-  and of the game with no screen at all.
+  and of the game with no screen at all. tools/wolfbench.sh collects them, and has
+  not run on the board itself.
 * What a load and a store cost, each on its own: tools/storecost.c.
 * The Zb build: that the processor carries out the three kinds of instruction (the
   device tree lists them, and the build tries one of each before anything else), and

@@ -39,15 +39,41 @@ In the order of use to me. Start in the data folder each time:
    store to it. It has only run under the emulator, where it prints its table and
    every time in it is a nanosecond.
 
-2. A full panel at 25 frames a second. --scale fill is one way, and gave 29.7. The
+2. Every mode, timed, in one go. tools/wolfbench.sh plays the timed demo in each of
+   ten picture modes, one after the other, and puts the frame rates in a table. Copy
+   it to the card's folder, beside the data, and at the panel:
+     sh wolfbench.sh
+   It takes ten minutes or so, and wants the keyboard left alone: a key ends a demo
+   early, and the table says so if that happens. Each line of the table appears as
+   its run ends, like this one (the 35.3 is the figure you have; the 36.1 and the 22
+   are made up, to show the layout):
+     mode     options          frames demo s    fps   view run s  what
+     default  (none)              691   19.6   35.3   36.1    22  320x200 shown as 640x400
+   "fps" is the game's own "timedemo" line; "view" leaves out the fade at the start
+   of the demo; "run s" is the whole run by the clock, loading included. At the end
+   the table is added to wolfbench.txt in the same folder, with the date, the
+   binary's checksum and the processor's "isa" line above it. Some modes only, or
+   another binary:
+     sh wolfbench.sh default fill r400
+     sh wolfbench.sh /root/wolf3d2zb
+     sh wolfbench.sh --help
+   The last lists the modes. The first four are the ones that matter (the default,
+   --scale fill, --resf 400 240, --scale aspect); the fifth is the game with no
+   screen at all; the rest draw at 640x400 and 800x480 and take a minute or two each.
+   A run that has not ended after ten minutes is ended with "killall wolf3d2", which
+   the game answers by putting the console back, and the next mode is run.
+   The script has run under the emulator only, though under the board's own shell
+   and tools: the game drew into memory there, and the timer was tried on a game
+   slowed down and on a stand-in that hangs. So the first time, watch that the prompt
+   comes back after the first line of the table, as it does when you run the game by
+   hand. By hand, any line of the table is "/root/wolf3d2 --timedemo 0" and its
+   options.
+
+3. A full panel at 25 frames a second. --scale fill is one way, and gave 29.7. The
    other is to draw the view at 400x240 and double it, so that every pixel is two by
-   two on the panel:
-     /root/wolf3d2 --timedemo 0 --resf 400 240
-   It prints
-     wolf3d: drawn at 400x240, shown at 800x480 from (0,0)
-     timedemo 0: 691 frames in N s (F fps)
-   and by the arithmetic in BUILD.txt F should be about 26. Then play both and see
-   which you would rather look at:
+   two on the panel: --resf 400 240, the "r400" line of the table. By the arithmetic
+   in BUILD.txt it should give about 26. Play both and see which you would rather
+   look at:
      /root/wolf3d2 --scale fill
      /root/wolf3d2 --resf 400 240
    With --scale fill the menus fill the panel too, and pixels are two or three panel
@@ -56,7 +82,7 @@ In the order of use to me. Start in the data folder each time:
    the top left corner at 640x400. --resf 800 480, which draws every pixel of the
    panel, stays slow: about 7 or 8 by the same arithmetic.
 
-3. Look at it. These are what the new drawing code could get wrong, in any mode:
+4. Look at it. These are what the new drawing code could get wrong, in any mode:
    * Anything left behind on the screen when the view moves: a piece of wall, a
      sprite, a number in the status bar that does not change when it should. Only
      what changed since the last frame is written, so a mistake there shows as
@@ -70,15 +96,6 @@ In the order of use to me. Start in the data folder each time:
      /root/wolf3d2 --scale off --res 640 400
    is the first version's drawing code in this binary, and /root/wolf3d is the first
    version itself. Say which is right and which is wrong.
-
-4. Three more timed lines, when there is time. They fill in the table in BUILD.txt.
-     SDL_VIDEODRIVER=dummy /root/wolf3d2 --timedemo 0
-     /root/wolf3d2 --timedemo 0 --res 640 400
-     /root/wolf3d2 --timedemo 0 --scale aspect
-   The first draws nothing on the panel at all: it is the game alone, and says how
-   much of a frame is the picture's trip to the screen. The second draws at 640x400
-   as the first version did, but puts it on the screen the new way. The frame count
-   has to be 691 every time.
 
 5. The Zb build. wolf3d-korvo-zb is the same game from the same sources, built so
    that the compiler may use the processor's Zba, Zbb and Zbs instructions. First see
@@ -94,9 +111,8 @@ In the order of use to me. Start in the data folder each time:
      wolf3d: this build is for a processor with Zbb, and this one does not have it.
      Use the build without "zb" in its name.
    and ends with the console untouched. If the options print, time it against the
-   lines you have already:
-     /root/wolf3d2zb --timedemo 0
-     /root/wolf3d2zb --timedemo 0 --scale fill
+   other build:
+     sh wolfbench.sh /root/wolf3d2zb default fill r400
    Expect little. Under the emulator it carries out 3 to 4 in 100 fewer instructions
    and should make the same stores, which by the figures above is about half a frame
    a second.
@@ -228,7 +244,7 @@ Do not use "killall -9 wolf3d2": it kills the guard along with the game.
 
 If something is wrong
 =====================
-* Picture wrong, console fine: the end of step 3 of "What to run next".
+* Picture wrong, console fine: the end of step 4 of "What to run next".
 * No picture and no way out: Alt+F4, then wait for a timer if one is running.
 * Console dead: see "What can go wrong with the console" above.
 * For a report, the "SDL fbcon:" lines and the last lines printed are the most useful,

@@ -27,7 +27,7 @@ esp32-s31-korvo-1/      one folder per board
     build.sh            fetches the sources, applies the patches, builds
     patches/            one patch for SDL 1.2.15, one for Wolf4SDL
     tests/              a fake console, and every way out of the game checked against it
-    tools/              storecost.c - times loads and stores on the board
+    tools/              for the board: a script that times every picture mode, and storecost.c
 LICENSES/               licence texts for the patched projects
 ```
 

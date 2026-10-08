@@ -120,6 +120,8 @@ The mouse turns and walks you, the left button fires, the right button strafes a
 
 [TEST-PLAN.txt](TEST-PLAN.txt) lists what's still worth running on the board, and walks through a first run with the safest steps first. It installs the game as `/root/wolf3d2`, because on my board the first version is still at `/root/wolf3d`.
 
+[`tools/wolfbench.sh`](tools/wolfbench.sh) is for the board itself. Copy it beside the data and run `sh wolfbench.sh`: it plays the timed demo in each of ten picture modes, puts the frame rates in a table and adds the table to `wolfbench.txt` on the card. All ten take about ten minutes; `sh wolfbench.sh default fill` does just those two, and a path as the first word times another binary. It's been tried under emulation with the board's own shell, not yet on the board.
+
 [tests/](tests/) has what runs under `qemu-riscv32-static`. A fake console stands in for the framebuffer, the virtual terminals and the input devices, and the files that talk to the console are compiled against it unchanged. Each case starts SDL or the game, does something to it - a key, a signal, `kill -9`, a crash, a failing system call - and checks that the console was left as it was found, and by which steps. The game also reads the screen back after every picture and stops if a pixel isn't what it drew. Then 36 deliberately broken copies have to make at least one case fail each.
 
 `run-tests.sh` needs the trees `build.sh` leaves behind and your own data files. [tests/results.txt](tests/results.txt) is the last full run, and [tests/results-zb.txt](tests/results-zb.txt) the run against the Zb build.
