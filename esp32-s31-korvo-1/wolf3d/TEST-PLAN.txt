@@ -1,0 +1,257 @@
+Testing Wolfenstein 3D on the Korvo-1
+=====================================
+
+Where things stand
+==================
+The first version ran on the board on 2026-10-08: it started first go, with and
+without --resf 800 480, and with that option managed 6.2 frames a second in play.
+
+The second version (wolf3d-korvo, installed as /root/wolf3d2) ran on 2026-10-09. With
+--timedemo 0 it gave
+     (none)                          35.3 frames a second
+     --scale fill                    29.7
+     --scale off --res 640 400        8.1
+The last is the first version's way of drawing, in the same binary. That is all that
+has come back: nothing yet on how it looks, on the other modes, or on the mouse.
+
+/root/wolf3d is still the first version, and wolf3d-korvo-v1 its binary, should you
+want it again.
+
+What to run next
+================
+In the order of use to me. Start in the data folder each time:
+     cd /mnt/sd/wolf3d
+
+1. What a store costs. This is the quickest, and what the next round of changes to
+   the drawing code depends on. storecost-korvo is a small program that times loads,
+   stores and plain arithmetic in 4 MiB of its own memory and prints a table. It does
+   not touch the screen or the console, and Ctrl+C ends it. Run it at the panel, as
+   the game is, since the answer may depend on the LCD being on:
+     cp /mnt/sd/wolf3d/storecost-korvo /root/storecost
+     chmod +x /root/storecost
+     /root/storecost | tee /mnt/sd/wolf3d/storecost.txt
+   It should take under a minute, and leaves the table in storecost.txt on the card
+   as well as on the panel. The three frame rates above fit a store costing about
+   135 ns and an average instruction 16 ns (BUILD.txt, "What the board says"). The
+   table says how near that is, and three things a frame rate cannot: whether storing
+   four bytes costs more than storing one, whether going down a column costs more
+   than going along a line, and what it costs to look at memory before deciding to
+   store to it. It has only run under the emulator, where it prints its table and
+   every time in it is a nanosecond.
+
+2. A full panel at 25 frames a second. --scale fill is one way, and gave 29.7. The
+   other is to draw the view at 400x240 and double it, so that every pixel is two by
+   two on the panel:
+     /root/wolf3d2 --timedemo 0 --resf 400 240
+   It prints
+     wolf3d: drawn at 400x240, shown at 800x480 from (0,0)
+     timedemo 0: 691 frames in N s (F fps)
+   and by the arithmetic in BUILD.txt F should be about 26. Then play both and see
+   which you would rather look at:
+     /root/wolf3d2 --scale fill
+     /root/wolf3d2 --resf 400 240
+   With --scale fill the menus fill the panel too, and pixels are two or three panel
+   pixels wide by turns. With --resf 400 240 the view is wider and finer and its
+   pixels are even, but the menus, the title and the screens between levels sit in
+   the top left corner at 640x400. --resf 800 480, which draws every pixel of the
+   panel, stays slow: about 7 or 8 by the same arithmetic.
+
+3. Look at it. These are what the new drawing code could get wrong, in any mode:
+   * Anything left behind on the screen when the view moves: a piece of wall, a
+     sprite, a number in the status bar that does not change when it should. Only
+     what changed since the last frame is written, so a mistake there shows as
+     something stale.
+   * The fades between screens, and the red flash when hit.
+   * Dying: the screen fills with red a pixel at a time, then the level comes back
+     the same way.
+   * With --scale fill: the menus and the title filling the panel, like the game.
+   Add --showfps to see the rate in the top left corner while playing.
+   If the picture is wrong in any way,
+     /root/wolf3d2 --scale off --res 640 400
+   is the first version's drawing code in this binary, and /root/wolf3d is the first
+   version itself. Say which is right and which is wrong.
+
+4. Three more timed lines, when there is time. They fill in the table in BUILD.txt.
+     SDL_VIDEODRIVER=dummy /root/wolf3d2 --timedemo 0
+     /root/wolf3d2 --timedemo 0 --res 640 400
+     /root/wolf3d2 --timedemo 0 --scale aspect
+   The first draws nothing on the panel at all: it is the game alone, and says how
+   much of a frame is the picture's trip to the screen. The second draws at 640x400
+   as the first version did, but puts it on the screen the new way. The frame count
+   has to be 691 every time.
+
+5. The Zb build. wolf3d-korvo-zb is the same game from the same sources, built so
+   that the compiler may use the processor's Zba, Zbb and Zbs instructions. First see
+   what the kernel says the processor has:
+     grep isa /proc/cpuinfo
+   The line should name zba, zbb and zbs among the rest. The board's device tree
+   lists them, so I expect it to. Then, with wolf3d-korvo-zb in the card's folder:
+     cp /mnt/sd/wolf3d/wolf3d-korvo-zb /root/wolf3d2zb
+     chmod +x /root/wolf3d2zb
+     /root/wolf3d2zb --help
+   It should print its options. Before anything else it tries one instruction of
+   each of the three kinds, and if the processor does not have one it prints
+     wolf3d: this build is for a processor with Zbb, and this one does not have it.
+     Use the build without "zb" in its name.
+   and ends with the console untouched. If the options print, time it against the
+   lines you have already:
+     /root/wolf3d2zb --timedemo 0
+     /root/wolf3d2zb --timedemo 0 --scale fill
+   Expect little. Under the emulator it carries out 3 to 4 in 100 fewer instructions
+   and should make the same stores, which by the figures above is about half a frame
+   a second.
+   Where this file says "killall wolf3d2", the name for this build is wolf3d2zb.
+
+What can go wrong with the console, and how to get back
+=======================================================
+Nothing here changed in the second version, and no trouble with the console has been
+reported from either. It is kept for reference.
+
+The game puts the panel's console in graphics mode and its keyboard in raw mode, as
+fbDOOM does. If it ended without putting them back, the panel would show nothing you
+type. Three things stand in the way of that:
+
+  1. Every ordinary way out puts the console back: Quit from the menu, Alt+F4, an error,
+     a crash, "killall wolf3d2".
+  2. A second small process, the console guard, waits for the game to end and puts the
+     console back if the game did not. That covers "kill -9" and the kernel killing the
+     game when memory runs out. fbDOOM has nothing like it.
+  3. "/root/wolf3d2 --fix-console" does it by hand. It can be run from another login
+     (ssh, the UART), or from a timer started on the panel before the game.
+
+If the panel looks dead after a step:
+  * Wait for the timer, if one is running.
+  * Then type this blind and press Enter. If only the picture is stuck and the keyboard
+    is fine, it brings the text back:
+         /root/wolf3d2 --fix-console
+  * If what you type shows but programs behave oddly (no echo, Ctrl+C does nothing):
+         stty sane
+  * If none of that helps and there is no other way in, type "reboot" blind and press
+    Enter, and only then cut the power.
+
+The game writes nothing to the card. Its settings and saved games go in
+/root/.wolf4sdl/ on the root file system. If you want a power cycle to be harmless to
+the FAT partition, make it read only before you start:
+     mount -o remount,ro /mnt/sd
+The kernel then marks the partition clean, so a reset does not set the dirty flag. (If
+the flag is set already from an earlier reset it stays set: only fsck.fat clears it.)
+That is from the kernel source; it has not been tried on the board.
+
+The careful version, for a board that has not run it
+====================================================
+Setting up: a folder "wolf3d" on the card's KORVO_SD partition, with wolf3d-korvo and
+the eight WL6 files from the game's "base" folder in Steam (AUDIOHED, AUDIOT, GAMEMAPS,
+MAPHEAD, VGADICT, VGAGRAPH, VGAHEAD, VSWAP; upper case names are fine, CONFIG.WL6 is
+not needed). Then the three commands of step 1 above. The game looks for its data in
+the directory it is started in.
+
+Step 1. Does the binary run? Nothing here changes the console.
+     /root/wolf3d2 --help
+It should print its options. Then:
+     /root/wolf3d2 --fix-console
+It should print
+     The console is in text mode with an ordinary keyboard. Nothing to do.
+That line means it could open the console and ask it how it is, which is what the
+console guard needs to be able to do. If it prints "The screen is not showing a
+console that this can open." the guard will not work: say so, and carry on with care.
+     cd / ; /root/wolf3d2 ; cd /mnt/sd/wolf3d
+From a directory without the data it should print
+     NO WOLFENSTEIN 3-D DATA FILES to be found!
+and give the prompt back a second later.
+
+Step 2. The whole game, without the screen. SDL's dummy video driver draws into
+memory, so the console is not touched.
+     SDL_VIDEODRIVER=dummy /root/wolf3d2 --timedemo 0
+It loads the data, plays the first demo as fast as it can, and prints
+     No sound: No available audio device
+     timedemo 0: 691 frames in N s (F fps)
+     wolf3d: 691 frames of the 3D view, N s of drawing (F fps)
+Note how long the whole thing took, from Enter to the prompt: step 3 needs it.
+If it ends with "Out of memory at ..." or the shell says "Killed", memory is short:
+note the message.
+
+Step 3. On the panel, hands off, with a timer behind it.
+     (sleep 180; killall wolf3d2; sleep 3; /root/wolf3d2 --fix-console) &
+     /root/wolf3d2 --timedemo 0
+Make the 180 at least three times the seconds that step 2 took, so that the timer
+does not cut the demo short. Touch nothing. Three lines beginning "SDL fbcon:" are
+printed, the screen goes black, the red sign-on screen shows for a moment, the demo
+plays fast, and the prompt comes back with the lines from step 2 under the
+"SDL fbcon:" lines. The picture is 640x400 in the middle of the panel, with a black
+border.
+The keyboard should work at the prompt. End the timer now with "kill %1". Left
+alone it does no harm: it prints "killall: wolf3d2: no process killed" and "The
+console is in text mode ...", but it would end a game you had started in the meantime.
+If the console is dead instead: wait for the timer. Its killall makes a game that is
+still running put the console back, and its --fix-console puts it back if the game
+has gone and left it. If it is still dead after that, see above.
+
+Step 4. Keys.
+     /root/wolf3d2
+Enter at the sign-on screen ("Press a key"), a key at the rating screen and at the
+title, then the menu: arrows and Enter, Esc to go back. Start a new game.
+     Arrows          move and turn            Ctrl       fire
+     Alt + arrows    strafe                   Shift      run
+     Space           open doors, use          1 to 4     weapons
+     Esc             menu                     F10, Y     quit
+     Alt+F4          quit at once, without asking
+Leave with Esc, Quit, Y. The prompt should come back with a line such as
+     wolf3d: 1830 frames of the 3D view, 61.0 s of drawing (30.0 fps)
+That rate counts the 3D view only and leaves out time spent in menus. In play the
+game never draws more than 70 frames a second.
+
+Step 5. Frame rates and the picture: "What to run next", above.
+
+Step 6. Mouse. Plug it in before starting.
+     /root/wolf3d2
+Among the lines printed at the start there should be one like
+     SDL fbcon: mouse on /dev/input/event1 (name of the mouse)
+or "SDL fbcon: no mouse found". They scroll away when the game takes the screen and
+are there again after you quit. In the game, left and right turn, forward and back
+walk, the left button fires, the right button strafes, the middle button is "use".
+Mouse sensitivity is in the Control menu.
+If no mouse is found, the output of these would help:
+     ls /dev/input
+     cat /proc/bus/input/devices
+If the mouse does something odd, "SDL_NOMOUSE=1 /root/wolf3d2" leaves it alone.
+
+Step 7. Only if you are curious, and ready for a power cycle: killing the game.
+     (sleep 20; killall wolf3d2) & /root/wolf3d2
+Start a game and wait. After 20 seconds the game should vanish and the prompt come
+back, with the shell saying "Terminated". Then the hard one:
+     sh -c '(sleep 20; kill -9 $$) & exec /root/wolf3d2'
+This kills the game in a way that it cannot catch, as the kernel does when memory runs
+out. The console guard should put the panel back in text mode within a moment, and the
+shell says "Killed". If programs you run afterwards do not show what you type, or
+Ctrl+C does nothing, type "stty sane" and press Enter.
+Do not use "killall -9 wolf3d2": it kills the guard along with the game.
+
+If something is wrong
+=====================
+* Picture wrong, console fine: the end of step 3 of "What to run next".
+* No picture and no way out: Alt+F4, then wait for a timer if one is running.
+* Console dead: see "What can go wrong with the console" above.
+* For a report, the "SDL fbcon:" lines and the last lines printed are the most useful,
+  with which step it was.
+
+Things that are known and expected
+==================================
+* No sound. The board has no sound device. "No sound: No available audio device" is
+  printed at the end of every run.
+* The game is drawn at 320x200, the size of the original, and enlarged. The default
+  doubles it: 640x400, with a border of 80 pixels left and right and 40 above and
+  below. --scale fill stretches it to the whole panel, which makes it a little wider
+  than it was drawn, with pixels two or three panel pixels wide by turns. --scale
+  aspect is 640x480, the shape it had on a monitor.
+* --res 640 400 and --resf 800 480 still draw the game finer, at several times the
+  work. With --resf 800 480 and --resf 400 240 the menus and full-screen pictures
+  stay 640x400 in the top left corner; with --scale fill they fill the panel.
+* The demos behind the title screen run at 17.5 frames a second at most. That is how
+  the game plays demos, not the board being slow. --timedemo takes the limit off.
+* The sign-on screen shows a mouse as present whether one is plugged in or not.
+* Ctrl+Alt+F1 to F12 do not switch consoles while the game runs. They are fire,
+  strafe and a function key pressed together, which happens in play.
+* "killall wolf3d2" ends the game at once. Nothing is saved on the way out that way.
+* A key that is still held down when the game ends repeats at the prompt.
+* A game that hangs without ending cannot be stopped from the panel: no key reaches
+  it. That is what the timer in step 3 is for. It has not happened under the emulator.

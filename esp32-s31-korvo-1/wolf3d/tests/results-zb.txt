@@ -1,0 +1,317 @@
+run-tests.sh against the Zb build, wolf3d-korvo-zb: every case in one go.
+The broken copies ("mutants") were not run again. They test the tests, and are in
+results.txt.
+Under qemu-riscv32 version 7.2.17 (Debian 1:7.2+dfsg-7+deb12u13), on 2026-10-09. Not on the board.
+The emulator's default processor has Zba, Zbb and Zbs.
+
+$ WORK=$HOME/wolf-scratch/build-zb BIN=$WORK/wolf3d-korvo-zb \
+      ARCH="-march=rv32imac_zicsr_zifencei_zba_zbb_zbs -mabi=ilp32" \
+      bash tests/run-tests.sh probe_sizes probe_stock probe_keys probe_mouse probe_ends \
+      probe_terminals probe_failures probe_signals probe_hangup game_play game_scale game_menu \
+      game_timedemo game_signals game_killed game_crashes game_errors game_mouse game_stock binary
+== build ==
+built: sdlprobe sdlprobe-stock wolf3d-fbtest wolf3d-fbtest-stock 
+
+-- probe-640x400 --
+PASS  probe-640x400: picture: 640x400 at (80,40), 1 colours
+
+-- probe-320x200 --
+PASS  probe-320x200: picture: 320x200 at (240,140), 1 colours
+
+-- probe-800x480 --
+PASS  probe-800x480: picture: 800x480 at (0,0), 1 colours
+
+-- probe-640x480 --
+PASS  probe-640x480: picture: 640x480 at (80,0), 1 colours
+
+-- probe-too-big --
+PASS  probe-too-big
+
+-- probe-startup-cost --
+PASS  probe-startup-cost: 3 mode requests, 2 console redraws, 2048 keymap requests, 0 screen switches, 0 waits that would hang, 0 key bytes dropped
+
+-- probe-double-buffer --
+PASS  probe-double-buffer: asking for double buffering gets a second copy of the screen
+
+-- stock-no-mouse --
+PASS  stock-no-mouse: SDL as released does not start without a mouse device
+
+-- stock-startup-cost --
+PASS  stock-startup-cost: 62 mode requests, 61 console redraws, 65536 keymap requests, 2 screen switches, 0 waits that would hang, 0 key bytes dropped
+
+-- probe-keys --
+PASS  probe-keys: 30 key events from 15 key presses, none from the key above 127
+
+-- probe-keys-vtswitch --
+PASS  probe-keys-vtswitch: with SDL_FBCON_VTSWITCH set, Ctrl+Alt+F2 moves the screen as it used to
+
+-- probe-unread-keys --
+PASS  probe-unread-keys: 4 unread key bytes dropped
+
+-- probe-mouse --
+PASS  probe-mouse: 13 mouse events
+
+-- probe-mouse-unplugged --
+PASS  probe-mouse-unplugged: the program carries on
+
+-- probe-nomouse --
+PASS  probe-nomouse
+
+-- probe-end-return --
+PASS  probe-end-return: ended without SDL_Quit
+
+-- probe-end-exit --
+PASS  probe-end-exit: ended without SDL_Quit
+
+-- probe-signal-after-quit --
+PASS  probe-signal-after-quit: after SDL_Quit, SIGTERM ends the program as it should
+
+-- probe-from-ssh-root --
+PASS  probe-from-ssh-root: not started on a console: a new terminal is used, and left again
+
+-- probe-from-ssh-user --
+PASS  probe-from-ssh-user
+
+-- probe-newvt-asked-for --
+PASS  probe-newvt-asked-for
+
+-- probe-newvt-killed --
+PASS  probe-newvt-killed: SIGTERM on a new terminal: put back, and the screen is on vt1 again
+
+-- probe-no-tiocgdev --
+PASS  probe-no-tiocgdev: an old kernel, not root: the terminal it was started on, as SDL always did
+
+-- probe-fails-tcgetattr --
+PASS  probe-fails-tcgetattr: failed: Unable to get terminal attributes
+
+-- probe-fails-KDGKBMODE --
+PASS  probe-fails-KDGKBMODE: failed: Unable to get current keyboard mode
+
+-- probe-fails-KDSKBMODE --
+PASS  probe-fails-KDSKBMODE: failed: Unable to set keyboard in raw mode
+
+-- probe-fails-KDSETMODE --
+PASS  probe-fails-KDSETMODE: failed: Unable to set keyboard in graphics mode
+
+-- probe-fails-mmap --
+PASS  probe-fails-mmap: failed: Unable to memory map the video hardware
+
+-- probe-fails-FBIOGET_FSCREENINFO --
+PASS  probe-fails-FBIOGET_FSCREENINFO: failed: Couldn't get console hardware info
+
+-- probe-SIGSEGV --
+run-tests.sh: line 177: 1239233 Segmentation fault      (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  probe-SIGSEGV: died of the signal, console put back first
+
+-- probe-SIGBUS --
+run-tests.sh: line 177: 1239267 Bus error               (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  probe-SIGBUS: died of the signal, console put back first
+
+-- probe-SIGILL --
+run-tests.sh: line 177: 1239297 Illegal instruction     (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  probe-SIGILL: died of the signal, console put back first
+
+-- probe-SIGFPE --
+run-tests.sh: line 177: 1239326 Floating point exception(core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  probe-SIGFPE: died of the signal, console put back first
+
+-- probe-SIGABRT --
+run-tests.sh: line 177: 1239354 Aborted                 (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  probe-SIGABRT: died of the signal, console put back first
+
+-- probe-SIGTERM --
+PASS  probe-SIGTERM: died of the signal, console put back first
+
+-- probe-SIGHUP --
+PASS  probe-SIGHUP: died of the signal, console put back first
+
+-- probe-SIGINT --
+PASS  probe-SIGINT: died of the signal, console put back first
+
+-- probe-SIGQUIT --
+run-tests.sh: line 177: 1239450 Quit                    (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  probe-SIGQUIT: died of the signal, console put back first
+
+-- probe-SIGPIPE --
+PASS  probe-SIGPIPE: died of the signal, console put back first
+
+-- probe-SIGALRM --
+PASS  probe-SIGALRM: ignored, as SDL sets it: the program carries on
+
+-- probe-SIGUSR1 --
+run-tests.sh: line 177: 1239525 User defined signal 1   ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  probe-SIGUSR1: died of the signal, console put back first
+
+-- probe-SIGUSR2 --
+run-tests.sh: line 177: 1239548 User defined signal 2   ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  probe-SIGUSR2: died of the signal, console put back first
+
+-- probe-hangup --
+run-tests.sh: line 177: 1239572 Hangup                  ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  probe-hangup: the terminal was hung up: it is opened again by its number, and put back
+
+-- game-play-default --
+PASS  game-play-default: picture: 640x400 at (80,40), 118 colours; wolf3d: 271 frames of the 3D view, 3.3 s of drawing (81.5 fps)
+
+-- game-play-fill --
+PASS  game-play-fill: picture: 800x480 at (0,0), 117 colours; wolf3d: 242 frames of the 3D view, 3.3 s of drawing (73.0 fps)
+
+-- game-play-aspect --
+PASS  game-play-aspect: picture: 640x480 at (80,0), 117 colours; wolf3d: 246 frames of the 3D view, 3.3 s of drawing (74.3 fps)
+
+-- game-play-drawn-640x400 --
+PASS  game-play-drawn-640x400: picture: 640x400 at (80,40), 119 colours; wolf3d: 219 frames of the 3D view, 3.3 s of drawing (65.8 fps)
+
+-- game-play-drawn-800x480 --
+PASS  game-play-drawn-800x480: picture: 800x480 at (0,0), 119 colours; wolf3d: 208 frames of the 3D view, 3.2 s of drawing (63.9 fps)
+
+-- game-play-scale-off --
+PASS  game-play-scale-off: picture: 320x200 at (240,140), 117 colours; wolf3d: 595 frames of the 3D view, 3.3 s of drawing (179.3 fps)
+
+-- game-scale-exact --
+PASS  game-scale-exact: whole, fill and aspect: every pixel on the screen is the one it should be
+
+-- game-scale-one-to-one --
+PASS  game-scale-one-to-one: at 640x400 and 800x480 the screen is the same, byte for byte, as with SDL's code
+
+-- game-fizzle-whole --
+PASS  game-fizzle-whole: the picture after each fade is the one it should be
+
+-- game-fizzle-fill --
+PASS  game-fizzle-fill: the picture after each fade is the one it should be
+
+-- game-menu-quit --
+PASS  game-menu-quit: sign-on, rating, title, main menu, quit; the configuration is saved
+
+-- game-timedemo --
+PASS  game-timedemo: timedemo 0: 691 frames in 0.7 s (933.8 fps)
+
+-- game-timedemo-stopped --
+PASS  game-timedemo-stopped: timedemo 1: 152 frames in 2.8 s (53.6 fps), stopped early
+
+-- game-SIGSEGV --
+run-tests.sh: line 177: 1240234 Segmentation fault      (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-SIGSEGV: died of the signal, console put back first
+
+-- game-SIGBUS --
+run-tests.sh: line 177: 1240269 Bus error               (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-SIGBUS: died of the signal, console put back first
+
+-- game-SIGILL --
+run-tests.sh: line 177: 1240303 Illegal instruction     (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-SIGILL: died of the signal, console put back first
+
+-- game-SIGFPE --
+run-tests.sh: line 177: 1240347 Floating point exception(core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-SIGFPE: died of the signal, console put back first
+
+-- game-SIGABRT --
+run-tests.sh: line 177: 1240380 Aborted                 (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-SIGABRT: died of the signal, console put back first
+
+-- game-SIGTERM --
+PASS  game-SIGTERM: died of the signal, console put back first
+
+-- game-SIGHUP --
+PASS  game-SIGHUP: died of the signal, console put back first
+
+-- game-SIGINT --
+PASS  game-SIGINT: died of the signal, console put back first
+
+-- game-SIGQUIT --
+run-tests.sh: line 177: 1240539 Quit                    (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-SIGQUIT: died of the signal, console put back first
+
+-- game-SIGPIPE --
+PASS  game-SIGPIPE: died of the signal, console put back first
+
+-- game-SIGALRM --
+PASS  game-SIGALRM: ignored, as SDL sets it: the program carries on
+
+-- game-SIGUSR1 --
+run-tests.sh: line 177: 1240631 User defined signal 1   ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-SIGUSR1: died of the signal, console put back first
+
+-- game-SIGUSR2 --
+PASS  game-SIGUSR2: died of the signal, console put back first
+
+-- game-SIGKILL --
+run-tests.sh: line 177: 1240684 Killed                  ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-SIGKILL: nothing in the game ran; the console guard put the console back
+
+-- game-SIGKILL-no-guard --
+run-tests.sh: line 177: 1240707 Killed                  ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-SIGKILL-no-guard: without the guard the console is left dead, as expected; --fix-console revives it
+
+-- game-SIGKILL-newvt --
+run-tests.sh: line 177: 1240749 Killed                  ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-SIGKILL-newvt: started from another login and killed: the guard also brings the screen back to vt1
+
+-- game-fix-console-nothing-to-do --
+PASS  game-fix-console-nothing-to-do
+
+-- game-fix-console-from-a-timer --
+run-tests.sh: line 177: 1240783 Killed                  ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-fix-console-from-a-timer: run as a background job of the dead terminal, it is not stopped, and revives it
+
+-- game-killed-on-the-way-in --
+PASS  game-killed-on-the-way-in: killed with only the terminal settings changed: the guard puts those back
+
+-- game-SIGKILL-switched-away --
+run-tests.sh: line 177: 1240824 Killed                  ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-SIGKILL-switched-away: killed while the screen was on another terminal: the one it was started on is put right too
+
+-- game-crash-null --
+run-tests.sh: line 177: 1240850 Segmentation fault      (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-crash-null
+
+-- game-crash-abort --
+run-tests.sh: line 177: 1240885 Aborted                 (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-crash-abort
+
+-- game-crash-stack --
+run-tests.sh: line 177: 1240917 Segmentation fault      (core dumped) ( cd "$DATA" && exec env HOME="$d/home" FAKE_STATE="$d/state" FAKE_LOG="$d/log" FAKE_FB="$d/fb" FAKE_KBD="$d/kbd" FAKE_QEMU="$QEMUPATH" FAKE_CRASH="$d/crash" WOLF3D_CHECK_PRESENT=1 $extra "$QEMUPATH" "$@" ) >> "$d/log" 2>&1
+PASS  game-crash-stack
+
+-- game-crash-exit --
+PASS  game-crash-exit
+
+-- game-crash-_exit --
+PASS  game-crash-_exit: _exit() runs nothing in the game: the console guard put the console back
+
+-- game-error-no-gamemaps --
+PASS  game-error-no-gamemaps: the error is printed after the terminal is back in text mode
+
+-- game-error-no-audiot --
+PASS  game-error-no-audiot: the error is printed after the terminal is back in text mode
+
+-- game-mode-too-big --
+PASS  game-mode-too-big
+
+-- game-graphics-mode-refused --
+PASS  game-graphics-mode-refused
+
+-- game-mouse --
+PASS  game-mouse: moving the mouse turns the view
+
+-- stock-game --
+PASS  stock-game: the game on SDL as released: 63 mode requests, 61 console redraws, 65536 keymap requests, 2 screen switches, 0 waits that would hang, 0 key bytes dropped
+
+-- binary --
+PASS  binary: all four demos play to the end with the real data and no sound device; 39e118098480e0c0...
+
+== 88 passed, 0 failed ==
+
+After that run a case was added to the binary group: the build on a processor without
+each of the three extensions. That group again, without building the test programs
+again (NOBUILD=1):
+
+$ NOBUILD=1 WORK=... BIN=... ARCH=... bash tests/run-tests.sh binary
+
+-- binary --
+PASS  binary: all four demos play to the end with the real data and no sound device; 39e118098480e0c0...
+
+-- binary-processor --
+PASS  binary-processor: without Zba, Zbb or Zbs this build says which is missing and ends
+
+== 2 passed, 0 failed ==

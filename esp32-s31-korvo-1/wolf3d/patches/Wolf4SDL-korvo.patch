@@ -1,0 +1,1831 @@
+Wolf4SDL: running on the Linux frame buffer console of a small board
+
+Against https://github.com/ioan-chera/Wolf4SDL, branch wolf4sdl, commit
+51b3694e58bad8c9be9cddba720f86a4749d469c (2011-10-08; a git copy of the
+Wolf4SDL svn repository at the last revision that uses SDL 1.2).
+Apply with: git apply Wolf4SDL-korvo.patch
+
+Written for the ESP32-S31-Korvo-1 running esp32-s31-linux, which has no
+sound device and whose screen is also the terminal the game is started
+from.  The changes are offered under the GNU GPL version 2, the licence the
+game is built under here (see license-gpl.txt; build with GPL=1).
+
+id_sd.cpp
+    With no sound device the game carries on without sound.  It used to end
+    at start-up with "SD_PrepareSound(0): DigiList not initialized!".
+
+id_vl.cpp, id_vh.cpp
+    Double buffering is off unless --dblbuf asks for it, and the screen is
+    asked for as a hardware surface: the game then draws straight into the
+    frame buffer.  Where the screen cannot flip pages SDL answers a request
+    for double buffering with a second copy of the screen (512 KB at
+    640x400) that it copies across on every frame.
+    The small pictures of the status bar are ordinary memory, not hardware
+    surfaces: as those, SDL made them in the format of the screen.
+
+id_vp.cpp, id_vp.h (new), id_vl.cpp, id_vh.cpp, wl_draw.cpp, wl_main.cpp
+    The game draws at 320x200 unless --res says otherwise, and the picture
+    is enlarged on its way to the screen: --scale whole (by the largest
+    whole number that fits, the default), fill (the whole screen) or aspect
+    (the largest 4:3 picture).  A copy of what is on the screen is kept, and
+    only what differs from it is written, four source pixels at a time and
+    two screen pixels to a store.  As released the game handed its whole
+    picture to SDL on every frame, which converted every pixel of it, and
+    filling a larger screen meant drawing the game larger.  On the board
+    this was written for, where every store to memory is slow, a frame of
+    the first demo went from 478,000 stores to 83,000.  --scale off leaves
+    it to SDL as before; --screen gives the size of the screen where SDL
+    cannot tell.  WOLF3D_CHECK_PRESENT in the environment makes the game
+    read the screen back after every picture and stop if it is not what it
+    drew: for tests.
+
+id_ca.cpp, id_ca.h, id_pm.cpp, wl_menu.cpp
+    A data file that is not there under its name in lower case is looked
+    for in upper case, as copies from DOS and Windows have them.
+
+wl_main.cpp, wl_game.cpp, wl_play.cpp, wl_draw.cpp, wl_def.h
+    --timedemo <0-3> plays a demo as fast as it will go, prints the frame
+    rate and ends.  --showfps turns on the frame counter that is already in
+    the game.  A line with the frames drawn and the rate is printed at the
+    end of every run.
+    Before an error is printed the console is put back in text mode.
+
+wl_fbcon.cpp, wl_fbcon.h (new), Makefile
+    Messages are kept until the game ends: in graphics mode the console
+    does not scroll, and what is printed lands on one line.
+    A console guard: a second small process that waits for the game to end
+    and puts the console back in text mode if the game did not (it was
+    killed with SIGKILL, say, which is what the kernel does when memory
+    runs out).  WOLF3D_NOGUARD=1 in the environment turns it off.
+    --fix-console does the same by hand: from another login, or from a
+    timer started before the game.
+    Built for a RISC-V processor with Zba, Zbb or Zbs, the game tries one
+    instruction of each at start-up and says what is missing, where it
+    would otherwise stop with "Illegal instruction" at the first one it
+    met, which could be in the middle of a level.
+
+diff --git a/Makefile b/Makefile
+index 4804636..79fd65c 100644
+--- a/Makefile
++++ b/Makefile
+@@ -56,6 +56,7 @@ SRCS += id_in.cpp
+ SRCS += id_pm.cpp
+ SRCS += id_sd.cpp
+ SRCS += id_us_1.cpp
++SRCS += id_vp.cpp
+ SRCS += id_vh.cpp
+ SRCS += id_vl.cpp
+ SRCS += signon.cpp
+@@ -66,6 +67,7 @@ SRCS += wl_atmos.cpp
+ SRCS += wl_cloudsky.cpp
+ SRCS += wl_debug.cpp
+ SRCS += wl_draw.cpp
++SRCS += wl_fbcon.cpp
+ SRCS += wl_floorceiling.cpp
+ SRCS += wl_game.cpp
+ SRCS += wl_inter.cpp
+diff --git a/id_ca.cpp b/id_ca.cpp
+index 452688a..8b0020b 100644
+--- a/id_ca.cpp
++++ b/id_ca.cpp
+@@ -15,6 +15,7 @@ loaded into the data segment
+ */
+ 
+ #include <sys/types.h>
++#include <sys/stat.h>
+ #if defined _WIN32
+     #include <io.h>
+ #elif defined _arch_dreamcast
+@@ -93,6 +94,35 @@ static const char afilename[] = "audiot.";
+ 
+ void CA_CannotOpen(const char *string);
+ 
++/*
++======================
++=
++= CA_FileName
++=
++= The data files are asked for by their names in lower case.  Copies made
++= under DOS or Windows often have them in upper case, which is another file
++= where the file system tells the two apart.  Returns the name to open: the
++= one given, or the same in upper case if only that is there.
++=
++======================
++*/
++
++const char *CA_FileName (const char *name)
++{
++    static char upper[32];
++    struct stat statbuf;
++    size_t      i;
++
++    if (!stat(name, &statbuf) || strlen(name) >= sizeof(upper))
++        return name;
++
++    for (i = 0; name[i]; i++)
++        upper[i] = toupper((unsigned char) name[i]);
++    upper[i] = 0;
++
++    return stat(upper, &statbuf) ? name : upper;
++}
++
+ static int32_t  grstarts[NUMCHUNKS + 1];
+ static int32_t* audiostarts; // array of offsets in audio / audiot
+ 
+@@ -463,7 +493,7 @@ void CAL_SetupGrFile (void)
+     strcpy(fname,gdictname);
+     strcat(fname,graphext);
+ 
+-    handle = open(fname, O_RDONLY | O_BINARY);
++    handle = open(CA_FileName(fname), O_RDONLY | O_BINARY);
+     if (handle == -1)
+         CA_CannotOpen(fname);
+ 
+@@ -474,7 +504,7 @@ void CAL_SetupGrFile (void)
+     strcpy(fname,gheadname);
+     strcat(fname,graphext);
+ 
+-    handle = open(fname, O_RDONLY | O_BINARY);
++    handle = open(CA_FileName(fname), O_RDONLY | O_BINARY);
+     if (handle == -1)
+         CA_CannotOpen(fname);
+ 
+@@ -513,7 +543,7 @@ void CAL_SetupGrFile (void)
+     strcpy(fname,gfilename);
+     strcat(fname,graphext);
+ 
+-    grhandle = open(fname, O_RDONLY | O_BINARY);
++    grhandle = open(CA_FileName(fname), O_RDONLY | O_BINARY);
+     if (grhandle == -1)
+         CA_CannotOpen(fname);
+ 
+@@ -555,7 +585,7 @@ void CAL_SetupMapFile (void)
+     strcpy(fname,mheadname);
+     strcat(fname,extension);
+ 
+-    handle = open(fname, O_RDONLY | O_BINARY);
++    handle = open(CA_FileName(fname), O_RDONLY | O_BINARY);
+     if (handle == -1)
+         CA_CannotOpen(fname);
+ 
+@@ -574,14 +604,14 @@ void CAL_SetupMapFile (void)
+     strcpy(fname, "gamemaps.");
+     strcat(fname, extension);
+ 
+-    maphandle = open(fname, O_RDONLY | O_BINARY);
++    maphandle = open(CA_FileName(fname), O_RDONLY | O_BINARY);
+     if (maphandle == -1)
+         CA_CannotOpen(fname);
+ #else
+     strcpy(fname,mfilename);
+     strcat(fname,extension);
+ 
+-    maphandle = open(fname, O_RDONLY | O_BINARY);
++    maphandle = open(CA_FileName(fname), O_RDONLY | O_BINARY);
+     if (maphandle == -1)
+         CA_CannotOpen(fname);
+ #endif
+@@ -636,7 +666,7 @@ void CAL_SetupAudioFile (void)
+     strcat(fname,audioext);
+ 
+     void* ptr;
+-    if (!CA_LoadFile(fname, &ptr))
++    if (!CA_LoadFile(CA_FileName(fname), &ptr))
+         CA_CannotOpen(fname);
+     audiostarts = (int32_t*)ptr;
+ 
+@@ -646,7 +676,7 @@ void CAL_SetupAudioFile (void)
+     strcpy(fname,afilename);
+     strcat(fname,audioext);
+ 
+-    audiohandle = open(fname, O_RDONLY | O_BINARY);
++    audiohandle = open(CA_FileName(fname), O_RDONLY | O_BINARY);
+     if (audiohandle == -1)
+         CA_CannotOpen(fname);
+ }
+diff --git a/id_ca.h b/id_ca.h
+index 87a8886..748d0d6 100644
+--- a/id_ca.h
++++ b/id_ca.h
+@@ -44,6 +44,8 @@ int32_t CA_RLEWCompress (word *source, int32_t length, word *dest, word rlewtag)
+ 
+ void CA_RLEWexpand (word *source, word *dest, int32_t length, word rlewtag);
+ 
++const char *CA_FileName (const char *name);
++
+ void CA_Startup (void);
+ void CA_Shutdown (void);
+ 
+diff --git a/id_pm.cpp b/id_pm.cpp
+index 5d52484..3b58f00 100644
+--- a/id_pm.cpp
++++ b/id_pm.cpp
+@@ -19,7 +19,7 @@ void PM_Startup()
+     char fname[13] = "vswap.";
+     strcat(fname,extension);
+ 
+-    FILE *file = fopen(fname,"rb");
++    FILE *file = fopen(CA_FileName(fname),"rb");
+     if(!file)
+         CA_CannotOpen(fname);
+ 
+diff --git a/id_sd.cpp b/id_sd.cpp
+index fc118f9..874d07a 100644
+--- a/id_sd.cpp
++++ b/id_sd.cpp
+@@ -606,6 +606,11 @@ Sint16 GetSample(float csample, byte *samples, int size)
+ 
+ void SD_PrepareSound(int which)
+ {
++    // No sound device: there is nothing to prepare the sounds for.  (The
++    // game used to end here, on the check below.)
++    if(!SD_Started)
++        return;
++
+     if(DigiList == NULL)
+         Quit("SD_PrepareSound(%i): DigiList not initialized!\n", which);
+ 
+@@ -1119,7 +1124,7 @@ SD_Startup(void)
+ 
+     if(Mix_OpenAudio(param_samplerate, AUDIO_S16, 2, param_audiobuffer))
+     {
+-        printf("Unable to open audio: %s\n", Mix_GetError());
++        FBC_Note("No sound: %s\n", Mix_GetError());
+         return;
+     }
+ 
+diff --git a/id_vh.cpp b/id_vh.cpp
+index 6497ac7..f33cf40 100644
+--- a/id_vh.cpp
++++ b/id_vh.cpp
+@@ -118,8 +118,7 @@ void VW_MeasurePropString (const char *string, word *width, word *height)
+ 
+ void VH_UpdateScreen()
+ {
+-	SDL_BlitSurface(screenBuffer, NULL, screen, NULL);
+-	SDL_Flip(screen);
++	VP_Present(screenBuffer);
+ }
+ 
+ 
+@@ -244,7 +243,10 @@ void LoadLatchMem (void)
+ //
+ // tile 8s
+ //
+-    surf = SDL_CreateRGBSurface(SDL_HWSURFACE, 8*8,
++    // These pictures are kept as plain memory, one byte a pixel, and are read
++    // and written that way.  Asked for as hardware surfaces, SDL makes them in
++    // the format of the screen wherever the screen is a hardware surface.
++    surf = SDL_CreateRGBSurface(SDL_SWSURFACE, 8*8,
+         ((NUMTILE8 + 7) / 8) * 8, 8, 0, 0, 0, 0);
+     if(surf == NULL)
+     {
+@@ -275,7 +277,7 @@ void LoadLatchMem (void)
+ 	{
+ 		width = pictable[i-STARTPICS].width;
+ 		height = pictable[i-STARTPICS].height;
+-		surf = SDL_CreateRGBSurface(SDL_HWSURFACE, width, height, 8, 0, 0, 0, 0);
++		surf = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, 8, 0, 0, 0, 0);
+         if(surf == NULL)
+         {
+             Quit("Unable to create surface for picture!");
+@@ -364,6 +366,8 @@ boolean FizzleFade (SDL_Surface *source, int x1, int y1,
+ 
+     IN_StartAck ();
+ 
++    VP_FizzleStart();
++
+     frame = GetTimeCount();
+     byte *srcptr = VL_LockSurface(source);
+     if(srcptr == NULL) return false;
+@@ -375,8 +379,7 @@ boolean FizzleFade (SDL_Surface *source, int x1, int y1,
+         if(abortable && IN_CheckAck ())
+         {
+             VL_UnlockSurface(source);
+-            SDL_BlitSurface(source, NULL, screen, NULL);
+-            SDL_Flip(screen);
++            VP_Present(source);
+             return true;
+         }
+ 
+@@ -422,6 +425,10 @@ boolean FizzleFade (SDL_Surface *source, int x1, int y1,
+                         *(destptr + (y1 + y) * screen->pitch + x1 + x)
+                             = *(srcptr + (y1 + y) * source->pitch + x1 + x);
+                     }
++                    else if(VP_Active())
++                    {
++                        VP_Pixel(destptr, x1 + x, y1 + y, *(srcptr + (y1 + y) * source->pitch + x1 + x));
++                    }
+                     else
+                     {
+                         byte col = *(srcptr + (y1 + y) * source->pitch + x1 + x);
+@@ -464,7 +471,6 @@ boolean FizzleFade (SDL_Surface *source, int x1, int y1,
+ finished:
+     VL_UnlockSurface(source);
+     VL_UnlockSurface(screen);
+-    SDL_BlitSurface(source, NULL, screen, NULL);
+-    SDL_Flip(screen);
++    VP_Present(source);
+     return false;
+ }
+diff --git a/id_vl.cpp b/id_vl.cpp
+index 1e3e3d9..b331f05 100644
+--- a/id_vl.cpp
++++ b/id_vl.cpp
+@@ -32,9 +32,15 @@ unsigned screenBits = 8;
+ unsigned screenBits = 16;
+ #endif
+ #else
+-boolean usedoublebuffering = true;
+-unsigned screenWidth = 640;
+-unsigned screenHeight = 400;
++// Off unless --dblbuf asks for it.  Where the screen cannot flip pages, SDL
++// answers a request for double buffering with a second copy of the screen
++// that it copies across on every frame; the frame buffer console of a small
++// board cannot, and has neither the memory nor the time for that.
++boolean usedoublebuffering = false;
++// The size the game draws at.  It is enlarged on its way to the screen
++// (id_vp.cpp), which is far less work than drawing it large.
++unsigned screenWidth = 320;
++unsigned screenHeight = 200;
+ unsigned screenBits = -1;      // use "best" color depth according to libSDL
+ #endif
+ 
+@@ -108,16 +114,22 @@ void	VL_SetVGAPlaneMode (void)
+         screenBits = vidInfo->vfmt->BitsPerPixel;
+     }
+ 
+-    screen = SDL_SetVideoMode(screenWidth, screenHeight, screenBits,
+-          (usedoublebuffering ? SDL_HWSURFACE | SDL_DOUBLEBUF : 0)
++    // The screen's own size where the picture is going to be enlarged to it
++    unsigned modeWidth, modeHeight;
++    VP_ScreenSize(&modeWidth, &modeHeight);
++
++    screen = SDL_SetVideoMode(modeWidth, modeHeight, screenBits,
++          SDL_HWSURFACE | (usedoublebuffering ? SDL_DOUBLEBUF : 0)
+         | (screenBits == 8 ? SDL_HWPALETTE : 0)
+         | (fullscreen ? SDL_FULLSCREEN : 0));
+     if(!screen)
+     {
+-        printf("Unable to set %ix%ix%i video mode: %s\n", screenWidth,
+-            screenHeight, screenBits, SDL_GetError());
++        FBC_TextMode();
++        printf("Unable to set %ix%ix%i video mode: %s\n", modeWidth,
++            modeHeight, screenBits, SDL_GetError());
+         exit(1);
+     }
++    VP_Startup();
+     if((screen->flags & SDL_DOUBLEBUF) != SDL_DOUBLEBUF)
+         usedoublebuffering = false;
+     SDL_ShowCursor(SDL_DISABLE);
+@@ -129,6 +141,7 @@ void	VL_SetVGAPlaneMode (void)
+         screenHeight, 8, 0, 0, 0, 0);
+     if(!screenBuffer)
+     {
++        FBC_TextMode();
+         printf("Unable to create screen buffer surface: %s\n", SDL_GetError());
+         exit(1);
+     }
+@@ -220,8 +233,8 @@ void VL_SetColor	(int color, int red, int green, int blue)
+     else
+     {
+         SDL_SetPalette(curSurface, SDL_LOGPAL, &col, color, 1);
+-        SDL_BlitSurface(curSurface, NULL, screen, NULL);
+-        SDL_Flip(screen);
++        VP_PaletteChanged();
++        VP_Present(curSurface);
+     }
+ }
+ 
+@@ -262,11 +275,9 @@ void VL_SetPalette (SDL_Color *palette, bool forceupdate)
+     else
+     {
+         SDL_SetPalette(curSurface, SDL_LOGPAL, palette, 0, 256);
++        VP_PaletteChanged();
+         if(forceupdate)
+-        {
+-            SDL_BlitSurface(curSurface, NULL, screen, NULL);
+-            SDL_Flip(screen);
+-        }
++            VP_Present(curSurface);
+     }
+ }
+ 
+diff --git a/id_vp.cpp b/id_vp.cpp
+new file mode 100644
+index 0000000..7115a46
+--- /dev/null
++++ b/id_vp.cpp
+@@ -0,0 +1,436 @@
++// ID_VP.CPP
++//
++// Putting the picture on the screen.
++//
++// The game draws into a buffer of its own, one byte a pixel.  It used to hand
++// that to SDL on every frame, which turned all of it into the screen's pixels
++// one at a time, changed or not, and showed it at its own size.  For a screen
++// larger than the original 320x200 that meant drawing the game at a larger
++// size to fill it: four times the pixels at 640x400, and SDL's work on top.
++//
++// Here the game goes on drawing at the size it likes, 320x200 by default,
++// and this enlarges the picture on its way to the screen.  It keeps a copy of
++// what is on the screen now, compares the new picture with it four pixels at
++// a time, and writes only what is different, two screen pixels to a store.
++// On a machine where every store to memory is slow, that is most of the
++// difference between six frames a second and twenty.
++//
++// This is used where the screen has 16 bits a pixel and no second page.
++// Anywhere else, and with --scale off, SDL does it as before.
++
++#include "wl_def.h"
++
++extern SDL_Color curpal[256];
++
++int      vp_mode = VP_WHOLE;
++unsigned vp_screenwidth, vp_screenheight;
++
++static boolean  active;
++static int      dstx, dsty, dstw, dsth;     // where on the screen the picture goes
++
++// Nearest neighbour: the source column and row for each column and row of
++// the picture on the screen, and the other way round, the first column and
++// row on the screen of each source column and row (with one more entry at
++// the end, so that the next entry is always where a source pixel stops).
++static uint16_t *xmap, *ymap;
++static uint16_t *xstart, *ystart;
++
++// What is on the screen now, as the source pixels it was made from
++static byte     *shadow;
++static boolean  shadowvalid;
++
++// The colours as screen pixels, each in both halves of a word
++static uint32_t pal32[256];
++static boolean  paldirty = true;
++
++// Widths that have a row loop of their own
++enum { XP_ANY, XP_1, XP_2, XP_5_2 };
++static int      xpat;
++
++// WOLF3D_CHECK_PRESENT in the environment: after every picture, read the
++// screen back and compare it with the picture, pixel by pixel.  For tests.
++static boolean  selfcheck;
++
++// Four source pixels at a time
++typedef uint32_t __attribute__((may_alias)) word_t;
++
++// Two screen pixels in one store: the first from a, the second from b
++#define PAIR(a, b) (((a) & 0xffff) | ((b) & 0xffff0000))
++
++void VP_ScreenSize(unsigned *width, unsigned *height)
++{
++    const SDL_VideoInfo *info = SDL_GetVideoInfo();
++    unsigned w = vp_screenwidth ? vp_screenwidth : (unsigned) info->current_w;
++    unsigned h = vp_screenheight ? vp_screenheight : (unsigned) info->current_h;
++
++    *width = screenWidth;
++    *height = screenHeight;
++
++    if(vp_mode != VP_OFF && screenBits == 16 && w >= screenWidth && h >= screenHeight)
++    {
++        *width = w;
++        *height = h;
++    }
++}
++
++boolean VP_Active(void)
++{
++    return active;
++}
++
++void VP_PaletteChanged(void)
++{
++    paldirty = true;
++}
++
++static void MakePalette(void)
++{
++    for(int i = 0; i < 256; i++)
++    {
++        uint32_t v = SDL_MapRGB(screen->format, curpal[i].r, curpal[i].g, curpal[i].b) & 0xffff;
++        pal32[i] = v | (v << 16);
++    }
++    paldirty = false;
++}
++
++//
++// Which row loop suits the columns in xmap.  A special one is only chosen
++// when every entry of xmap agrees with it, so that it draws exactly what a
++// loop through xmap would; and only where its stores are aligned.
++//
++static int Pattern(void)
++{
++    int sw = screenWidth;
++    boolean is1 = dstw == sw, is2 = dstw == sw * 2, is5_2 = dstw * 2 == sw * 5;
++
++#if SDL_BYTEORDER != SDL_LIL_ENDIAN
++    return XP_ANY;
++#endif
++    if((sw & 3) || (dstx & 1) || (screen->pitch & 3) || ((uintptr_t) screen->pixels & 3))
++        return XP_ANY;
++
++    for(int i = 0; i < dstw; i++)
++    {
++        if(xmap[i] != i)
++            is1 = false;
++        if(xmap[i] != i / 2)
++            is2 = false;
++        if(xmap[i] != i / 5 * 2 + (i % 5 >= 2))
++            is5_2 = false;
++    }
++    return is1 ? XP_1 : is2 ? XP_2 : is5_2 ? XP_5_2 : XP_ANY;
++}
++
++void VP_Startup(void)
++{
++    int w = screen->w, h = screen->h;
++    int sw = screenWidth, sh = screenHeight;
++    int i, c, f;
++
++    active = false;
++    free(xmap); free(ymap); free(xstart); free(ystart); free(shadow);
++    xmap = ymap = xstart = ystart = NULL;
++    shadow = NULL;
++
++    if(vp_mode == VP_OFF || screen->format->BitsPerPixel != 16
++            || (screen->flags & SDL_DOUBLEBUF) || w < sw || h < sh)
++        return;
++
++    dstw = w;
++    dsth = h;
++    if(vp_mode == VP_ASPECT)
++    {
++        if(w * 3 > h * 4)
++            dstw = h * 4 / 3;
++        else
++            dsth = w * 3 / 4;
++    }
++    if(vp_mode == VP_WHOLE || dstw < sw || dsth < sh)
++    {
++        f = w / sw < h / sh ? w / sw : h / sh;
++        dstw = sw * f;
++        dsth = sh * f;
++    }
++    dstx = ((w - dstw) / 2) & ~1;
++    dsty = (h - dsth) / 2;
++
++    xmap = (uint16_t *) malloc(dstw * sizeof(*xmap));
++    ymap = (uint16_t *) malloc(dsth * sizeof(*ymap));
++    xstart = (uint16_t *) malloc((sw + 1) * sizeof(*xstart));
++    ystart = (uint16_t *) malloc((sh + 1) * sizeof(*ystart));
++    shadow = (byte *) malloc(sw * sh);
++    if(!xmap || !ymap || !xstart || !ystart || !shadow)
++        return;     // SDL can still do it, unscaled
++
++    // The source is sampled at the centre of each pixel of the picture
++    for(i = 0; i < dstw; i++)
++        xmap[i] = ((2 * i + 1) * sw) / (2 * dstw);
++    for(i = 0; i < dsth; i++)
++        ymap[i] = ((2 * i + 1) * sh) / (2 * dsth);
++
++    for(i = 0, c = 0; i < dstw; i++)
++        while(c <= xmap[i])
++            xstart[c++] = i;
++    while(c <= sw)
++        xstart[c++] = dstw;
++    for(i = 0, c = 0; i < dsth; i++)
++        while(c <= ymap[i])
++            ystart[c++] = i;
++    while(c <= sh)
++        ystart[c++] = dsth;
++
++    xpat = Pattern();
++    shadowvalid = false;
++    paldirty = true;
++    selfcheck = getenv("WOLF3D_CHECK_PRESENT") != NULL;
++    active = true;
++
++    FBC_Note("wolf3d: drawn at %dx%d, shown at %dx%d from (%d,%d)\n", sw, sh, dstw, dsth, dstx, dsty);
++}
++
++/*
++=============================================================================
++
++    The row loops.  Each takes one row of the picture and writes it to the
++    n rows of the screen that show it, skipping every four pixels that are
++    on the screen already unless all is set.
++
++=============================================================================
++*/
++
++#define ROW_LOOP static inline __attribute__((always_inline)) void
++
++// Twice the width: each source pixel is one store
++ROW_LOOP Row2(byte *row, int line, int n, const byte *src, byte *shd, int words, boolean all)
++{
++    for(int i = 0; i < words; i++, row += 16)
++    {
++        uint32_t v = ((const word_t *) (const void *) src)[i];
++        if(!all && v == ((const word_t *) (const void *) shd)[i])
++            continue;
++        ((word_t *) (void *) shd)[i] = v;
++
++        uint32_t a = pal32[v & 0xff], b = pal32[(v >> 8) & 0xff];
++        uint32_t c = pal32[(v >> 16) & 0xff], d = pal32[v >> 24];
++        word_t *o = (word_t *) (void *) row;
++        int k = n;
++        do
++        {
++            o[0] = a; o[1] = b; o[2] = c; o[3] = d;
++            o = (word_t *) (void *) ((byte *) o + line);
++        } while(--k);
++    }
++}
++
++// Two and a half times the width (320 to 800): the source pixels a b c d
++// become a a b b b c c d d d, which is five stores
++ROW_LOOP Row5_2(byte *row, int line, int n, const byte *src, byte *shd, int words, boolean all)
++{
++    for(int i = 0; i < words; i++, row += 20)
++    {
++        uint32_t v = ((const word_t *) (const void *) src)[i];
++        if(!all && v == ((const word_t *) (const void *) shd)[i])
++            continue;
++        ((word_t *) (void *) shd)[i] = v;
++
++        uint32_t a = pal32[v & 0xff], b = pal32[(v >> 8) & 0xff];
++        uint32_t c = pal32[(v >> 16) & 0xff], d = pal32[v >> 24];
++        uint32_t bc = PAIR(b, c), cd = PAIR(c, d);
++        word_t *o = (word_t *) (void *) row;
++        int k = n;
++        do
++        {
++            o[0] = a; o[1] = b; o[2] = bc; o[3] = cd; o[4] = d;
++            o = (word_t *) (void *) ((byte *) o + line);
++        } while(--k);
++    }
++}
++
++// The same width: two source pixels to a store
++ROW_LOOP Row1(byte *row, int line, int n, const byte *src, byte *shd, int words, boolean all)
++{
++    for(int i = 0; i < words; i++, row += 8)
++    {
++        uint32_t v = ((const word_t *) (const void *) src)[i];
++        if(!all && v == ((const word_t *) (const void *) shd)[i])
++            continue;
++        ((word_t *) (void *) shd)[i] = v;
++
++        uint32_t ab = PAIR(pal32[v & 0xff], pal32[(v >> 8) & 0xff]);
++        uint32_t cd = PAIR(pal32[(v >> 16) & 0xff], pal32[v >> 24]);
++        word_t *o = (word_t *) (void *) row;
++        int k = n;
++        do
++        {
++            o[0] = ab; o[1] = cd;
++            o = (word_t *) (void *) ((byte *) o + line);
++        } while(--k);
++    }
++}
++
++// Any width, through xmap, a row at a time and a pixel to a store
++static void RowAny(byte *row, int line, int n, const byte *src, byte *shd, boolean all)
++{
++    if(!all && !memcmp(src, shd, screenWidth))
++        return;
++    memcpy(shd, src, screenWidth);
++
++    for(; n > 0; n--, row += line)
++    {
++        uint16_t *o = (uint16_t *) (void *) row;
++        for(int x = 0; x < dstw; x++)
++            o[x] = (uint16_t) pal32[src[xmap[x]]];
++    }
++}
++
++//
++// Reads the screen back and compares it with the picture
++//
++static void Check(SDL_Surface *source)
++{
++    const byte *src = VL_LockSurface(source);
++    const byte *dst = VL_LockSurface(screen);
++    int badx = -1, bady = -1;
++    uint16_t want[256];
++
++    // the screen cannot be had while it is on another terminal
++    if(src == NULL || dst == NULL)
++    {
++        if(dst != NULL)
++            VL_UnlockSurface(screen);
++        if(src != NULL)
++            VL_UnlockSurface(source);
++        return;
++    }
++
++    // from the colours as they are, not from the table the picture was
++    // drawn with
++    for(int i = 0; i < 256; i++)
++        want[i] = (uint16_t) SDL_MapRGB(screen->format, curpal[i].r, curpal[i].g, curpal[i].b);
++
++    for(int y = 0; y < dsth && badx < 0; y++)
++    {
++        const byte *s = src + ymap[y] * source->pitch;
++        const uint16_t *o = (const uint16_t *) (const void *) (dst + (dsty + y) * screen->pitch) + dstx;
++        for(int x = 0; x < dstw; x++)
++        {
++            if(o[x] != want[s[xmap[x]]])
++            {
++                badx = x;
++                bady = y;
++                break;
++            }
++        }
++    }
++    for(int y = 0; y < (int) screenHeight && badx < 0; y++)
++    {
++        if(memcmp(src + y * source->pitch, shadow + y * screenWidth, screenWidth))
++        {
++            badx = 0;
++            bady = ystart[y];
++        }
++    }
++    VL_UnlockSurface(screen);
++    VL_UnlockSurface(source);
++
++    if(badx >= 0)
++        Quit("VP_Check: the screen is not the picture at (%d,%d)", dstx + badx, dsty + bady);
++}
++
++void VP_Present(SDL_Surface *source)
++{
++    if(!active)
++    {
++        SDL_BlitSurface(source, NULL, screen, NULL);
++        SDL_Flip(screen);
++        return;
++    }
++
++    const byte *src = VL_LockSurface(source);
++    byte *dst = VL_LockSurface(screen);
++
++    if(src != NULL && dst != NULL)
++    {
++        const int line = screen->pitch, spitch = source->pitch;
++        const int sw = screenWidth, sh = screenHeight, words = sw / 4;
++        // the row loops read the picture four pixels at a time
++        const int pat = (((uintptr_t) src | spitch) & 3) ? XP_ANY : xpat;
++        boolean all = !shadowvalid;
++        byte *shd = shadow;
++
++        if(paldirty)
++        {
++            MakePalette();
++            all = true;
++        }
++
++        dst += dsty * line + dstx * 2;
++
++        for(int y = 0; y < sh; y++, src += spitch, shd += sw)
++        {
++            int n = ystart[y + 1] - ystart[y];
++            byte *row = dst + ystart[y] * line;
++
++            // n is small, and a constant where it matters: that takes the
++            // loop over the rows out of the loop over the pixels
++            if(n <= 0)
++                continue;
++            if(pat == XP_2)
++            {
++                if(n == 2) Row2(row, line, 2, src, shd, words, all);
++                else if(n == 3) Row2(row, line, 3, src, shd, words, all);
++                else Row2(row, line, n, src, shd, words, all);
++            }
++            else if(pat == XP_5_2)
++            {
++                if(n == 2) Row5_2(row, line, 2, src, shd, words, all);
++                else if(n == 3) Row5_2(row, line, 3, src, shd, words, all);
++                else Row5_2(row, line, n, src, shd, words, all);
++            }
++            else if(pat == XP_1)
++                Row1(row, line, n, src, shd, words, all);
++            else
++                RowAny(row, line, n, src, shd, all);
++        }
++        shadowvalid = true;
++    }
++
++    if(dst != NULL)
++        VL_UnlockSurface(screen);
++    if(src != NULL)
++        VL_UnlockSurface(source);
++
++    SDL_Flip(screen);
++
++    if(selfcheck)
++        Check(source);
++}
++
++//
++// The fizzle fade draws with the colours of now over a screen that may have
++// been drawn with others, a faded one for instance.  So the colours are
++// made here, and the picture that ends the fade is drawn in full.
++//
++void VP_FizzleStart(void)
++{
++    if(active && paldirty)
++    {
++        MakePalette();
++        shadowvalid = false;
++    }
++}
++
++void VP_Pixel(byte *dest, int x, int y, byte col)
++{
++    uint16_t v = (uint16_t) pal32[col];
++    int x0 = xstart[x], x1 = xstart[x + 1];
++
++    shadow[y * screenWidth + x] = col;
++
++    for(int r = ystart[y]; r < ystart[y + 1]; r++)
++    {
++        uint16_t *o = (uint16_t *) (void *) (dest + (dsty + r) * screen->pitch) + dstx;
++        for(int c = x0; c < x1; c++)
++            o[c] = v;
++    }
++}
+diff --git a/id_vp.h b/id_vp.h
+new file mode 100644
+index 0000000..428fa3a
+--- /dev/null
++++ b/id_vp.h
+@@ -0,0 +1,43 @@
++// ID_VP.H
++//
++// Putting the picture on the screen: see id_vp.cpp.
++
++#ifndef __ID_VP_H_
++#define __ID_VP_H_
++
++enum
++{
++    VP_OFF,         // SDL does it, as before: one pixel for one, in the middle
++    VP_WHOLE,       // enlarged by the largest whole number that fits, in the middle
++    VP_FILL,        // stretched to the whole screen
++    VP_ASPECT       // the largest picture of four by three that fits
++};
++
++extern int      vp_mode;                            // --scale
++extern unsigned vp_screenwidth, vp_screenheight;    // --screen; 0: ask SDL
++
++// The size to ask SDL_SetVideoMode for: the screen's own, or the picture's
++// where it is not going to be enlarged.
++void    VP_ScreenSize(unsigned *width, unsigned *height);
++
++// Call when the video mode has been set.
++void    VP_Startup(void);
++
++// The picture goes to the screen through here, not through SDL's blit.
++boolean VP_Active(void);
++
++// Call when the colours have changed.  The next VP_Present draws everything.
++void    VP_PaletteChanged(void);
++
++// Puts the picture on the screen.  Takes the place of SDL_BlitSurface from
++// the picture to the screen followed by SDL_Flip.
++void    VP_Present(SDL_Surface *source);
++
++// For the fizzle fade, which puts the picture on the screen a pixel at a
++// time.  VP_FizzleStart before the first, with nothing locked; then
++// VP_Pixel for each, with the screen locked and dest the address
++// VL_LockSurface gave for it; and VP_Present when it is over.
++void    VP_FizzleStart(void);
++void    VP_Pixel(byte *dest, int x, int y, byte col);
++
++#endif
+diff --git a/wl_def.h b/wl_def.h
+index 292c242..da20470 100644
+--- a/wl_def.h
++++ b/wl_def.h
+@@ -82,11 +82,13 @@ void Quit(const char *errorStr, ...);
+ #include "id_sd.h"
+ #include "id_in.h"
+ #include "id_vl.h"
++#include "id_vp.h"
+ #include "id_vh.h"
+ #include "id_us.h"
+ #include "id_ca.h"
+ 
+ #include "wl_menu.h"
++#include "wl_fbcon.h"
+ 
+ #define MAPSPOT(x,y,plane) (mapsegs[plane][((y)<<mapshift)+(x)])
+ 
+@@ -923,6 +925,7 @@ extern  char     configname[13];
+ // Command line parameter variables
+ //
+ extern  boolean  param_debugmode;
++extern  int      param_timedemo;
+ extern  boolean  param_nowait;
+ extern  int      param_difficulty;
+ extern  int      param_tedlevel;
+@@ -966,7 +969,7 @@ void    DrawPlayScreen (void);
+ void    DrawPlayBorderSides (void);
+ void    ShowActStatus();
+ 
+-void    PlayDemo (int demonumber);
++void    PlayDemo (int demonumber, uint32_t *start = NULL, unsigned *frames = NULL);
+ void    RecordDemo (void);
+ 
+ 
+diff --git a/wl_draw.cpp b/wl_draw.cpp
+index 9324638..55085fd 100644
+--- a/wl_draw.cpp
++++ b/wl_draw.cpp
+@@ -1628,10 +1628,11 @@ void    ThreeDRefresh (void)
+             US_Print(" fps");
+         }
+ #endif
+-        SDL_BlitSurface(screenBuffer, NULL, screen, NULL);
+-        SDL_Flip(screen);
++        VP_Present(screenBuffer);
+     }
+ 
++    FBC_Frame();
++
+ #ifndef REMDEBUG
+     if (fpscounter)
+     {
+diff --git a/wl_fbcon.cpp b/wl_fbcon.cpp
+new file mode 100644
+index 0000000..7a3eae9
+--- /dev/null
++++ b/wl_fbcon.cpp
+@@ -0,0 +1,523 @@
++// WL_FBCON.CPP
++//
++// Running on the Linux frame buffer console.
++//
++// There the screen the game draws on is also the terminal it was started
++// from.  SDL puts that terminal in graphics mode and its keyboard in raw
++// mode, and puts both back when the game ends.  Three things follow:
++//
++//  * Whatever is printed while the game runs is lost, or lands on top of
++//    the last line: in graphics mode the console does not scroll.  So
++//    messages are kept until the end (FBC_Note), and the terminal is put
++//    back first when the game is about to print an error (FBC_TextMode).
++//
++//  * If the game ends in a way that SDL cannot catch (SIGKILL, which is
++//    what the kernel sends a process when memory runs out), nothing puts
++//    the terminal back, and with no other way into the machine that takes
++//    a reboot.  So a second small process waits for the game to end and
++//    then looks at the terminal (the console guard).
++//
++//  * --fix-console does by hand what the guard does, from another login.
++//
++// None of this does anything when the game is not on a console: every step
++// begins by asking the terminal whether it is one.
++
++#include "wl_def.h"
++#include "wl_fbcon.h"
++
++#if defined(__linux__)
++
++#include <errno.h>
++#include <fcntl.h>
++#include <signal.h>
++#include <stdarg.h>
++#include <sched.h>
++#include <termios.h>
++#include <unistd.h>
++#include <sys/ioctl.h>
++#include <sys/syscall.h>
++#include <linux/kd.h>
++#include <linux/vt.h>
++
++/*
++=============================================================================
++
++                        MESSAGES KEPT FOR THE END
++
++=============================================================================
++*/
++
++static char     notes[1024];
++static size_t   noteslen;
++
++void FBC_Note(const char *format, ...)
++{
++    va_list vlist;
++    int     len;
++
++    if(noteslen >= sizeof(notes) - 1)
++        return;
++
++    va_start(vlist, format);
++    len = vsnprintf(notes + noteslen, sizeof(notes) - noteslen, format, vlist);
++    va_end(vlist);
++
++    if(len > 0)
++    {
++        noteslen += len;
++        if(noteslen > sizeof(notes) - 1)
++            noteslen = sizeof(notes) - 1;
++    }
++}
++
++/*
++=============================================================================
++
++                             FRAME COUNT
++
++=============================================================================
++*/
++
++static unsigned frames;         // every frame of the 3D view
++static unsigned timedframes;    // those that followed another within a second
++static uint32_t timedms;        // and the time between them
++static uint32_t lastframe;      // in ms, from SDL_GetTicks
++
++//
++// A frame that follows the one before it within a second counts towards the
++// frame rate.  A longer gap is not drawing time: a menu was up, or a level
++// was being loaded.
++//
++void FBC_Frame(void)
++{
++    uint32_t now = SDL_GetTicks();
++
++    if(frames++ && now - lastframe < 1000)
++    {
++        timedframes++;
++        timedms += now - lastframe;
++    }
++    lastframe = now;
++}
++
++unsigned FBC_Frames(void)
++{
++    return frames;
++}
++
++//
++// Runs at exit after SDL_Quit, because it is registered before it: the
++// terminal shows text again by now.
++//
++static void FBC_AtExit(void)
++{
++    // The 3D view only.  In play it is held to 70 frames a second, and
++    // demos to 17.5 unless --timedemo plays them.
++    if(timedframes > 0 && timedms > 0)
++    {
++        unsigned tenths = (timedms + 50) / 100;
++        unsigned fps10 = (unsigned) (((uint64_t) timedframes * 10000 + timedms / 2) / timedms);
++        FBC_Note("wolf3d: %u frames of the 3D view, %u.%u s of drawing (%u.%u fps)\n",
++            frames, tenths / 10, tenths % 10, fps10 / 10, fps10 % 10);
++    }
++
++    if(noteslen)
++    {
++        fwrite(notes, 1, noteslen, stdout);
++        fflush(stdout);
++        noteslen = 0;
++    }
++}
++
++void FBC_TextMode(void)
++{
++    if(SDL_WasInit(SDL_INIT_VIDEO))
++        SDL_QuitSubSystem(SDL_INIT_VIDEO);
++}
++
++/*
++=============================================================================
++
++                            CONSOLE GUARD
++
++=============================================================================
++*/
++
++//
++// The terminal that is on the screen now.  /dev/tty0 is that one for
++// whoever may open it; /dev/tty is the one we were started on.
++//
++static int OpenConsole(int *vt)
++{
++    struct vt_stat  state;
++    int             fd, mode;
++
++    fd = open("/dev/tty0", O_RDWR | O_NOCTTY);
++    if(fd < 0)
++        fd = open("/dev/tty", O_RDWR | O_NOCTTY);
++    if(fd < 0)
++        return -1;
++
++    if(ioctl(fd, KDGKBMODE, &mode) < 0 || ioctl(fd, VT_GETSTATE, &state) < 0)
++    {
++        close(fd);      // not a console
++        return -1;
++    }
++
++    *vt = state.v_active;
++    return fd;
++}
++
++//
++// What the terminal that was on the screen when the game started looked
++// like then.  The game finds this out before it changes anything, and
++// hands it to the guard.
++//
++static struct
++{
++    int             vt;         // -1: not a console
++    int             kbmode;
++    int             haveterm;
++    struct termios  term;
++} start = { -1 };
++
++static void RememberConsole(void)
++{
++    int fd = OpenConsole(&start.vt);
++
++    if(fd < 0)
++    {
++        start.vt = -1;
++        return;
++    }
++    if(ioctl(fd, KDGKBMODE, &start.kbmode) < 0)
++        start.kbmode = K_UNICODE;
++    start.haveterm = tcgetattr(fd, &start.term) == 0;
++    close(fd);
++}
++
++//
++// Puts one terminal right if it is in graphics mode, or its keyboard sends
++// raw codes, or its settings are the ones SDL gives it.  Returns true if
++// there was something to put right.
++//
++static boolean FixTerminal(int fd, int vt)
++{
++    struct termios  term;
++    int             kdmode = KD_TEXT, kbmode = K_UNICODE;
++    boolean         haveterm, rawterm;
++
++    ioctl(fd, KDGETMODE, &kdmode);
++    ioctl(fd, KDGKBMODE, &kbmode);
++    haveterm = tcgetattr(fd, &term) == 0;
++    // SDL's settings: no line editing, no echo, no signals from keys, and
++    // reads that do not wait.  No shell leaves a terminal like that.
++    rawterm = haveterm && !(term.c_lflag & (ICANON | ECHO | ISIG)) && term.c_cc[VMIN] == 0;
++
++    if(kdmode == KD_TEXT && kbmode != K_MEDIUMRAW && kbmode != K_RAW && !rawterm)
++        return false;
++
++    // The keyboard and the terminal settings first, and text mode after:
++    // going back to text mode redraws the screen, which takes a while, and
++    // the shell that was waiting for the game is about to read the settings.
++    if(vt == start.vt && start.haveterm)
++    {
++        ioctl(fd, KDSKBMODE, start.kbmode);
++        tcsetattr(fd, TCSAFLUSH, &start.term);
++    }
++    else
++    {
++        // What this terminal was like before is not known.  Give it the
++        // keyboard mode that the kernel starts terminals in, and undo the
++        // changes that SDL makes to the settings.
++        ioctl(fd, KDSKBMODE, vt == start.vt ? start.kbmode : K_UNICODE);
++        if(haveterm)
++        {
++            term.c_iflag |= ICRNL | IXON;
++            term.c_lflag |= ICANON | ECHO | ISIG;
++            term.c_cc[VMIN] = 1;
++            term.c_cc[VTIME] = 0;
++            tcsetattr(fd, TCSAFLUSH, &term);
++        }
++    }
++    ioctl(fd, KDSETMODE, KD_TEXT);
++    return true;
++}
++
++//
++// Looks at the terminal on the screen, and at the one the game was started
++// on if that is another, and puts right what a game that has gone left
++// behind.  If the game had moved the screen to a terminal of its own, the
++// screen goes back.  Returns true if there was something to put right.
++//
++// Only call this when no game is running: it cannot tell a game that has
++// died from one that is being played.
++//
++static boolean FixConsole(void)
++{
++    char    path[32];
++    boolean fixed, other = false;
++    int     vt, fd, fd2;
++
++    fd = OpenConsole(&vt);
++    if(fd < 0)
++        return false;
++
++    fixed = FixTerminal(fd, vt);
++
++    if(start.vt > 0 && vt != start.vt)
++    {
++        snprintf(path, sizeof(path), "/dev/tty%d", start.vt);
++        fd2 = open(path, O_RDWR | O_NOCTTY);
++        if(fd2 >= 0)
++        {
++            other = FixTerminal(fd2, start.vt);
++            close(fd2);
++        }
++    }
++
++    if(fixed)
++    {
++        ioctl(fd, VT_UNLOCKSWITCH, 1);
++        if(start.vt > 0 && vt != start.vt)
++            ioctl(fd, VT_ACTIVATE, start.vt);
++    }
++
++    close(fd);
++    return fixed || other;
++}
++
++//
++// The guard: started by the game before it touches anything, with one end
++// of a pipe that only the game holds the other end of.  When the game ends,
++// however it ends, the pipe closes and the read below returns.
++//
++static int GuardMain(int pipefd)
++{
++    static const int ignored[] = { SIGINT, SIGTERM, SIGHUP, SIGQUIT, SIGPIPE,
++        SIGALRM, SIGUSR1, SIGUSR2, SIGTTOU, SIGTTIN, SIGTSTP };
++    struct sched_param  param;
++    size_t              i, got = 0;
++    ssize_t             n;
++    char                c;
++
++    // Whatever is sent to the game by name or from the keyboard comes here
++    // too.  This has to outlast the game.
++    for(i = 0; i < lengthof(ignored); i++)
++        signal(ignored[i], SIG_IGN);
++
++    // Hold nothing open but the pipe
++    for(i = 0; i < 3; i++)
++    {
++        if((int) i != pipefd)
++        {
++            close(i);
++            open("/dev/null", O_RDWR);
++        }
++    }
++
++    // When the game dies, the shell that started it wakes up as well, and
++    // one of the first things a shell does is to read the terminal settings
++    // so that it can put them back after each command.  This has to get
++    // there before it does.  A real-time priority sees to that; nothing
++    // else here needs one, and nothing is lost if it is refused.  (The
++    // sched_setscheduler() of the C library does nothing, on purpose.)
++    param.sched_priority = 1;
++    syscall(SYS_sched_setscheduler, 0, SCHED_FIFO, &param);
++
++    // First what the console was like before the game changed it ...
++    while(got < sizeof(start))
++    {
++        n = read(pipefd, (char *) &start + got, sizeof(start) - got);
++        if(n < 0 && errno == EINTR)
++            continue;
++        if(n < 0)
++            return 1;   // not a pipe: started by hand
++        if(n == 0)
++            break;
++        got += n;
++    }
++    if(got < sizeof(start))
++    {
++        // the game went before it had said: go by what can be seen now
++        RememberConsole();
++        start.haveterm = false;
++        start.kbmode = K_UNICODE;
++    }
++    else
++    {
++        // ... and then nothing, until the game has gone
++        while((n = read(pipefd, &c, 1)) != 0)
++        {
++            if(n < 0 && errno != EINTR)
++                return 1;
++        }
++    }
++
++    FixConsole();
++    return 0;
++}
++
++static void StartGuard(void)
++{
++    char    arg[16];
++    int     fds[2];
++    pid_t   pid;
++
++    if(getenv("WOLF3D_NOGUARD"))
++        return;
++
++    RememberConsole();
++    if(start.vt < 0)
++        return;
++
++    if(pipe(fds) < 0)
++        return;
++
++    pid = fork();
++    if(pid == 0)
++    {
++        // A new program rather than a copy of this one, so that it does
++        // not hold on to this one's memory.  /proc/self/exe is this file
++        // whatever it was started as.
++        close(fds[1]);
++        snprintf(arg, sizeof(arg), "%d", fds[0]);
++        execl("/proc/self/exe", "wolf3d-guard", "--console-guard", arg, (char *) NULL);
++        _exit(127);
++    }
++
++    // Tell the guard what the console is like now, and then keep fds[1]
++    // open, and silent, for as long as the game runs.  No message if there
++    // is no guard: the game runs as well without.  (A guard that could not
++    // be started has gone already, and a write to a pipe that nobody reads
++    // is a SIGPIPE: not one to die of.)
++    void (*oldpipe)(int) = signal(SIGPIPE, SIG_IGN);
++
++    close(fds[0]);
++    if(pid < 0 || write(fds[1], &start, sizeof(start)) != (ssize_t) sizeof(start))
++        close(fds[1]);
++    else
++        fcntl(fds[1], F_SETFD, FD_CLOEXEC);
++
++    signal(SIGPIPE, oldpipe);
++}
++
++#if defined(__riscv_zba) || defined(__riscv_zbb) || defined(__riscv_zbs)
++
++// This build is for a processor with bit manipulation instructions.  One
++// without them stops at the first such instruction it meets, and that can be
++// anywhere: the middle of a level, say.  So one instruction of each kind the
++// compiler was allowed is tried before anything else is done, and the game
++// says what is missing in place of "Illegal instruction".  "Before anything
++// else" has to mean before the constructors of the program's static objects,
++// which run ahead of main(): the first such instruction is in one of them.
++// The C library is not built this way, so it and this function's own calls
++// are safe.
++
++#include <setjmp.h>
++
++static sigjmp_buf illjump;
++static const char *volatile trying;
++
++static void IllegalInstruction(int)
++{
++    siglongjmp(illjump, 1);
++}
++
++static void __attribute__((constructor(101))) CheckProcessor(void)
++{
++    struct sigaction act, old;
++    unsigned long one = 1, result;
++
++    memset(&act, 0, sizeof(act));
++    act.sa_handler = IllegalInstruction;
++    sigemptyset(&act.sa_mask);
++    sigaction(SIGILL, &act, &old);
++
++    if(sigsetjmp(illjump, 1))
++    {
++        fprintf(stderr, "wolf3d: this build is for a processor with %s, and this "
++            "one does not have it.\nUse the build without \"zb\" in its name.\n",
++            trying);
++        _exit(1);
++    }
++
++#ifdef __riscv_zba
++    trying = "Zba";
++    __asm__ volatile ("sh1add %0, %1, %1" : "=r" (result) : "r" (one));
++#endif
++#ifdef __riscv_zbb
++    trying = "Zbb";
++    __asm__ volatile ("andn %0, %1, %1" : "=r" (result) : "r" (one));
++#endif
++#ifdef __riscv_zbs
++    trying = "Zbs";
++    __asm__ volatile ("bset %0, %1, %1" : "=r" (result) : "r" (one));
++#endif
++    (void) result;
++
++    sigaction(SIGILL, &old, NULL);
++}
++
++#endif
++
++boolean FBC_Main(int argc, char *argv[], int *status)
++{
++    if(argc == 3 && !strcmp(argv[1], "--console-guard"))
++    {
++        *status = GuardMain(atoi(argv[2]));
++        return true;
++    }
++    if(argc == 2 && !strcmp(argv[1], "--fix-console"))
++    {
++        // Started from a timer, this is a background job on the terminal it
++        // is about to change the settings of, and the kernel stops such a
++        // job with SIGTTOU unless it ignores that
++        signal(SIGTTOU, SIG_IGN);
++        signal(SIGTTIN, SIG_IGN);
++        signal(SIGTSTP, SIG_IGN);
++
++        RememberConsole();
++        // What it was before is not known any more: the kernel's defaults
++        start.kbmode = K_UNICODE;
++        start.haveterm = false;
++        if(start.vt < 0)
++            puts("The screen is not showing a console that this can open.");
++        else if(FixConsole())
++            puts("The console was in graphics mode or had a raw keyboard. It has been put back.");
++        else
++            puts("The console is in text mode with an ordinary keyboard. Nothing to do.");
++        *status = 0;
++        return true;
++    }
++    return false;
++}
++
++void FBC_Startup(void)
++{
++    // Say on stderr which screen, keyboard and mouse SDL found.  This is
++    // printed before the screen is taken over, so it is still there after.
++    setenv("SDL_FBCON_VERBOSE", "1", 0);
++
++    atexit(FBC_AtExit);
++    StartGuard();
++}
++
++#else   // not Linux
++
++boolean FBC_Main(int argc, char *argv[], int *status) { return false; }
++void FBC_Startup(void) {}
++void FBC_TextMode(void) {}
++void FBC_Frame(void) {}
++unsigned FBC_Frames(void) { return 0; }
++
++void FBC_Note(const char *format, ...)
++{
++    va_list vlist;
++
++    va_start(vlist, format);
++    vprintf(format, vlist);
++    va_end(vlist);
++}
++
++#endif
+diff --git a/wl_fbcon.h b/wl_fbcon.h
+new file mode 100644
+index 0000000..319ca9c
+--- /dev/null
++++ b/wl_fbcon.h
+@@ -0,0 +1,29 @@
++// WL_FBCON.H
++//
++// Running on the Linux frame buffer console, where the screen the game draws
++// on is also the terminal it was started from.  See wl_fbcon.cpp.
++
++#ifndef __WL_FBCON_H_
++#define __WL_FBCON_H_
++
++// Handles --console-guard and --fix-console, which do their work and are
++// done.  Returns true if it was one of them, with the exit status in *status.
++boolean FBC_Main(int argc, char *argv[], int *status);
++
++// Call once, before SDL_Init and before atexit(SDL_Quit).
++void FBC_Startup(void);
++
++// Keeps a message until the program ends and the terminal shows text again.
++void FBC_Note(const char *format, ...);
++
++// Puts the terminal back in text mode now, so that what is printed next can
++// be read.  Nothing can be drawn after this.
++void FBC_TextMode(void);
++
++// Call when a frame of the 3D view has been put on the screen.
++void FBC_Frame(void);
++
++// The frames counted so far.
++unsigned FBC_Frames(void);
++
++#endif
+diff --git a/wl_game.cpp b/wl_game.cpp
+index fe0a3a6..1e17765 100644
+--- a/wl_game.cpp
++++ b/wl_game.cpp
+@@ -1156,7 +1156,7 @@ void RecordDemo (void) {return;}
+ ==================
+ */
+ 
+-void PlayDemo (int demonumber)
++void PlayDemo (int demonumber, uint32_t *start, unsigned *frames)
+ {
+     int length;
+ #ifdef DEMOSEXTERN
+@@ -1195,8 +1195,17 @@ void PlayDemo (int demonumber)
+     SetupGameLevel ();
+     StartMusic ();
+ 
++    // For --timedemo: when the frames began, and how many there were
++    if (start)
++        *start = SDL_GetTicks();
++    if (frames)
++        *frames = FBC_Frames();
++
+     PlayLoop ();
+ 
++    if (frames)
++        *frames = FBC_Frames() - *frames;
++
+ #ifdef DEMOSEXTERN
+     UNCACHEGRCHUNK(dems[demonumber]);
+ #else
+diff --git a/wl_main.cpp b/wl_main.cpp
+index 60b5192..eb98a6b 100644
+--- a/wl_main.cpp
++++ b/wl_main.cpp
+@@ -80,6 +80,7 @@ char    configname[13] = "config.";
+ // Command line parameter variables
+ //
+ boolean param_debugmode = false;
++int     param_timedemo = -1;
+ boolean param_nowait = false;
+ int     param_difficulty = 1;           // default is "normal"
+ int     param_tedlevel = -1;            // default is not to start a level
+@@ -1444,6 +1445,7 @@ void Quit (const char *errorStr, ...)
+     if (!pictable)  // don't try to display the red box before it's loaded
+     {
+         ShutdownId();
++        FBC_TextMode();
+         if (error && *error)
+         {
+ #ifdef NOTYET
+@@ -1477,6 +1479,7 @@ void Quit (const char *errorStr, ...)
+ #endif
+ 
+     ShutdownId ();
++    FBC_TextMode();
+ 
+     if (error && *error)
+     {
+@@ -1522,6 +1525,24 @@ static void DemoLoop()
+ {
+     int LastDemo = 0;
+ 
++    if (param_timedemo != -1)
++    {
++        uint32_t start;
++        unsigned frames;
++
++        PlayDemo (param_timedemo, &start, &frames);
++        start = SDL_GetTicks() - start;
++        if (start > 0 && frames > 0)
++        {
++            unsigned tenths = (start + 50) / 100;
++            unsigned fps10 = (unsigned) (((uint64_t) frames * 10000 + start / 2) / start);
++            FBC_Note("timedemo %d: %u frames in %u.%u s (%u.%u fps)%s\n", param_timedemo,
++                frames, tenths / 10, tenths % 10, fps10 / 10, fps10 % 10,
++                playstate == ex_abort ? ", stopped early" : "");
++        }
++        Quit (NULL);
++    }
++
+ //
+ // check for launch from ted
+ //
+@@ -1775,8 +1796,64 @@ void CheckParameters(int argc, char *argv[])
+                 }
+             }
+         }
++        else IFARG("--scale")
++        {
++            if(++i >= argc)
++            {
++                printf("The scale option needs one of off, whole, fill and aspect!\n");
++                hasError = true;
++            }
++            else if(!strcmp(argv[i], "off"))
++                vp_mode = VP_OFF;
++            else if(!strcmp(argv[i], "whole"))
++                vp_mode = VP_WHOLE;
++            else if(!strcmp(argv[i], "fill"))
++                vp_mode = VP_FILL;
++            else if(!strcmp(argv[i], "aspect"))
++                vp_mode = VP_ASPECT;
++            else
++            {
++                printf("The scale option needs one of off, whole, fill and aspect!\n");
++                hasError = true;
++            }
++        }
++        else IFARG("--screen")
++        {
++            if(i + 2 >= argc)
++            {
++                printf("The screen option needs the width and the height argument!\n");
++                hasError = true;
++            }
++            else
++            {
++                vp_screenwidth = atoi(argv[++i]);
++                vp_screenheight = atoi(argv[++i]);
++            }
++        }
+         else IFARG("--nodblbuf")
+             usedoublebuffering = false;
++        else IFARG("--dblbuf")
++            usedoublebuffering = true;
++        else IFARG("--showfps")
++            fpscounter = true;
++        else IFARG("--timedemo")
++        {
++            if(++i >= argc)
++            {
++                printf("The timedemo option is missing the demo number!\n");
++                hasError = true;
++            }
++            else
++            {
++                param_timedemo = atoi(argv[i]);
++                param_nowait = true;    // no "press a key" on the way in
++                if(param_timedemo < 0 || param_timedemo > 3)
++                {
++                    printf("The demo number must be between 0 and 3!\n");
++                    hasError = true;
++                }
++            }
++        }
+         else IFARG("--extravbls")
+         {
+             if(++i >= argc)
+@@ -1897,14 +1974,25 @@ void CheckParameters(int argc, char *argv[])
+             " --hard                 Sets the difficulty to hard for tedlevel\n"
+             " --nowait               Skips intro screens\n"
+             " --windowed[-mouse]     Starts the game in a window [and grabs mouse]\n"
+-            " --res <width> <height> Sets the screen resolution\n"
+-            "                        (must be multiple of 320x200 or 320x240)\n"
+-            " --resf <w> <h>         Sets any screen resolution >= 320x200\n"
++            " --res <width> <height> Sets the size the game draws at (default 320x200;\n"
++            "                        must be multiple of 320x200 or 320x240)\n"
++            " --resf <w> <h>         Sets any size >= 320x200 to draw at\n"
+             "                        (which may result in graphic errors)\n"
++            " --scale <how>          How the picture is put on a larger screen:\n"
++            "                        whole: enlarged by a whole number (default)\n"
++            "                        fill: stretched to the whole screen\n"
++            "                        aspect: the largest 4:3 picture that fits\n"
++            "                        off: not at all, by SDL, as it used to be\n"
++            " --screen <w> <h>       The size of the screen, where SDL cannot tell\n"
+             " --bits <b>             Sets the screen color depth\n"
+             "                        (use this when you have palette/fading problems\n"
+             "                        allowed: 8, 16, 24, 32, default: \"best\" depth)\n"
+-            " --nodblbuf             Don't use SDL's double buffering\n"
++            " --dblbuf               Use SDL's double buffering (off by default here)\n"
++            " --showfps              Shows the frame rate in the top left corner\n"
++            " --timedemo <0-3>       Plays a demo as fast as it will go, prints the\n"
++            "                        frame rate and ends\n"
++            " --fix-console          Puts a console back that a killed game has left in\n"
++            "                        graphics mode (from another login; nothing else)\n"
+             " --extravbls <vbls>     Sets a delay after each frame, which may help to\n"
+             "                        reduce flickering (unit is currently 8 ms, default: 0)\n"
+             " --joystick <index>     Use the index-th joystick if available\n"
+@@ -1945,6 +2033,11 @@ void CheckParameters(int argc, char *argv[])
+ 
+ int main (int argc, char *argv[])
+ {
++    int status;
++
++    if(FBC_Main(argc, argv, &status))
++        return status;
++
+ #if defined(_arch_dreamcast)
+     DC_Init();
+ #else
+@@ -1953,6 +2046,8 @@ int main (int argc, char *argv[])
+ 
+     CheckForEpisodes();
+ 
++    FBC_Startup();
++
+     InitGame();
+ 
+     DemoLoop();
+diff --git a/wl_menu.cpp b/wl_menu.cpp
+index b52b1b7..9cf19be 100644
+--- a/wl_menu.cpp
++++ b/wl_menu.cpp
+@@ -4030,12 +4030,12 @@ CheckForEpisodes (void)
+ //
+ #ifdef JAPAN
+ #ifdef JAPDEMO
+-    if(!stat("vswap.wj1", &statbuf))
++    if(!stat(CA_FileName("vswap.wj1"), &statbuf))
+     {
+         strcpy (extension, "wj1");
+         numEpisodesMissing = 5;
+ #else
+-    if(!stat("vswap.wj6", &statbuf))
++    if(!stat(CA_FileName("vswap.wj6"), &statbuf))
+     {
+         strcpy (extension, "wj6");
+ #endif
+@@ -4055,7 +4055,7 @@ CheckForEpisodes (void)
+ // ENGLISH
+ //
+ #ifdef UPLOAD
+-    if(!stat("vswap.wl1", &statbuf))
++    if(!stat(CA_FileName("vswap.wl1"), &statbuf))
+     {
+         strcpy (extension, "wl1");
+         numEpisodesMissing = 5;
+@@ -4064,7 +4064,7 @@ CheckForEpisodes (void)
+         Quit ("NO WOLFENSTEIN 3-D DATA FILES to be found!");
+ #else
+ #ifndef SPEAR
+-    if(!stat("vswap.wl6", &statbuf))
++    if(!stat(CA_FileName("vswap.wl6"), &statbuf))
+     {
+         strcpy (extension, "wl6");
+         NewEmenu[2].active =
+@@ -4077,7 +4077,7 @@ CheckForEpisodes (void)
+     }
+     else
+     {
+-        if(!stat("vswap.wl3", &statbuf))
++        if(!stat(CA_FileName("vswap.wl3"), &statbuf))
+         {
+             strcpy (extension, "wl3");
+             numEpisodesMissing = 3;
+@@ -4085,7 +4085,7 @@ CheckForEpisodes (void)
+         }
+         else
+         {
+-            if(!stat("vswap.wl1", &statbuf))
++            if(!stat(CA_FileName("vswap.wl1"), &statbuf))
+             {
+                 strcpy (extension, "wl1");
+                 numEpisodesMissing = 5;
+@@ -4102,28 +4102,28 @@ CheckForEpisodes (void)
+ #ifndef SPEARDEMO
+     if(param_mission == 0)
+     {
+-        if(!stat("vswap.sod", &statbuf))
++        if(!stat(CA_FileName("vswap.sod"), &statbuf))
+             strcpy (extension, "sod");
+         else
+             Quit ("NO SPEAR OF DESTINY DATA FILES TO BE FOUND!");
+     }
+     else if(param_mission == 1)
+     {
+-        if(!stat("vswap.sd1", &statbuf))
++        if(!stat(CA_FileName("vswap.sd1"), &statbuf))
+             strcpy (extension, "sd1");
+         else
+             Quit ("NO SPEAR OF DESTINY DATA FILES TO BE FOUND!");
+     }
+     else if(param_mission == 2)
+     {
+-        if(!stat("vswap.sd2", &statbuf))
++        if(!stat(CA_FileName("vswap.sd2"), &statbuf))
+             strcpy (extension, "sd2");
+         else
+             Quit ("NO SPEAR OF DESTINY DATA FILES TO BE FOUND!");
+     }
+     else if(param_mission == 3)
+     {
+-        if(!stat("vswap.sd3", &statbuf))
++        if(!stat(CA_FileName("vswap.sd3"), &statbuf))
+             strcpy (extension, "sd3");
+         else
+             Quit ("NO SPEAR OF DESTINY DATA FILES TO BE FOUND!");
+@@ -4133,7 +4133,7 @@ CheckForEpisodes (void)
+     strcpy (graphext, "sod");
+     strcpy (audioext, "sod");
+ #else
+-    if(!stat("vswap.sdm", &statbuf))
++    if(!stat(CA_FileName("vswap.sdm"), &statbuf))
+     {
+         strcpy (extension, "sdm");
+     }
+diff --git a/wl_play.cpp b/wl_play.cpp
+index 8cddd9c..29a79c3 100644
+--- a/wl_play.cpp
++++ b/wl_play.cpp
+@@ -409,6 +409,8 @@ void PollControls (void)
+         uint32_t curtime = SDL_GetTicks();
+         lasttimecount += DEMOTICS;
+         int32_t timediff = (lasttimecount * 100) / 7 - curtime;
++        if(param_timedemo != -1 && demoplayback)
++            timediff = 0;       // as fast as it will go: the game still moves by DEMOTICS a frame
+         if(timediff > 0)
+             SDL_Delay(timediff);
+ 

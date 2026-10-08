@@ -1,0 +1,565 @@
+Wolfenstein 3D for the ESP32-S31-Korvo-1 (esp32-s31-linux be5b725)
+===================================================================
+
+Status
+======
+The first version ran on the board on 2026-10-08: it started first go, with and without
+--resf 800 480. With --resf 800 480 it ended a game with
+     wolf3d: 941 frames of the 3D view, 150.9 s of drawing (6.2 fps)
+
+This is the second version. It puts the picture on the screen in another way, to get
+that frame rate up (see "Picture" below). Everything else is as it was in the first.
+It ran on the board on 2026-10-09, and with --timedemo 0 gave
+     (none)                          35.3 frames a second
+     --scale fill                    29.7
+     --scale off --res 640 400        8.1
+The last of those is the first version's way of drawing, in this binary. So the
+default is 4.4 times as fast as it was, and --scale fill, which covers the whole
+panel, 3.7 times as fast as the first version's 640x400.
+
+There are two builds of it from the same sources: wolf3d-korvo, which is the one that
+gave those figures, and wolf3d-korvo-zb, which lets the compiler use the processor's
+Zba, Zbb and Zbs instructions (see "The Zb build" below). That one has not run on the
+board.
+
+All were built with the board's toolchain and tested under qemu-riscv32-static: the
+binary itself with the real game data, and SDL's frame buffer driver and the game
+against a fake console (a frame buffer with one mode, virtual terminals, event
+devices). Both patches of the first version were read by a second reviewer against
+the board's kernel source, and what that found is fixed; the new picture code has not
+had that second reading. Apart from the four frame rates above, nothing in this file
+about how it looks, feels or performs on the panel has been reported from hardware.
+What is still to be confirmed is listed at the end.
+
+What it is
+==========
+Wolf4SDL, the SDL port of the original game, at the last revision that uses SDL 1.2,
+linked statically with SDL 1.2.15 and SDL_mixer 1.2.12. SDL's own frame buffer console
+driver ("fbcon") puts the picture on /dev/fb0 and reads the keyboard from the console,
+so nothing has to be installed on the board. One patch changes SDL and one the game.
+The game data is not here and must not be: it is commercial. You copy your own.
+
+Files
+=====
+patches/SDL-1.2.15-korvo-fbcon.patch   against the SDL 1.2.15 release tarball
+patches/Wolf4SDL-korvo.patch           against Wolf4SDL commit 51b3694
+build.sh                            fetches the sources, patches, builds
+tests/                              the fake console, the test programs, the last results
+tools/storecost.c                   times loads and stores on the board (see "Picture")
+TEST-PLAN.txt                       what to try on the board, safest steps first
+BUILD.txt                           this file
+
+The binaries, all static RV32 musl soft-float and stripped. They are not kept in the
+games repository: build.sh makes the first two, and gives these bytes.
+wolf3d-korvo                        661,848 bytes  runs on any RV32IMAC
+wolf3d-korvo-zb                     661,872 bytes  needs Zba, Zbb and Zbs as well
+wolf3d-korvo-v1                     657,744 bytes  the first version, unchanged
+storecost-korvo                      54,312 bytes  tools/storecost.c, built as it says
+
+SHA-256:
+fbb3ab87a7b925629b1f44dac35d81e296b5974830ded1f020ddb4492abdb743  wolf3d-korvo
+39e118098480e0c076c4e2bc77a05bf2c282148c5fab609eba9ac4da458e5a44  wolf3d-korvo-zb
+31dfc37a1891365a8c99e0bff56ea284b0f1877b53ab4227770f37596da78b9a  wolf3d-korvo-v1
+a55976bfa1b9ee765da33ce4fcf2c1822ece75e46247f55ce99f18c8809e1fc8  storecost-korvo
+
+wolf3d-korvo-v1 is the first version as it was handed over, kept as the way back. It
+was built from this same tree at an earlier state; the patches here are the second
+version's, and with "--scale off --res 640 400" the second version draws as the first
+did. wolf3d-korvo is byte for byte the file that was handed over as the second
+version: the check that the Zb build makes at start-up is not compiled into it.
+
+Each patch begins with a list of what it changes and why.
+
+Running it
+==========
+TEST-PLAN.txt has the steps in a careful order. In short: put wolf3d-korvo and the eight
+WL6 files in a folder "wolf3d" on the card's FAT partition, then on the panel
+     cp /mnt/sd/wolf3d/wolf3d-korvo /root/wolf3d2
+     chmod +x /root/wolf3d2
+     cd /mnt/sd/wolf3d
+     /root/wolf3d2
+That installs this version as /root/wolf3d2 and leaves the first at /root/wolf3d.
+The data has to be the full version 1.4 as GT Interactive and Activision sold it, which
+is what Steam has: VSWAP.WL6 is 1,544,376 bytes and VGAGRAPH.WL6 275,774. Other
+versions are refused with a message ("Wolf4SDL was not compiled for these data
+files"); they need a rebuild with other lines in version.h. The files are looked for in
+the current directory, in lower case first and then in upper case.
+Settings and saved games go in /root/.wolf4sdl/.
+
+Options
+=======
+(none)               draws 320x200, as the original did, and shows it doubled: 640x400
+                     in the middle of the panel
+--scale fill         the same picture stretched to the whole panel, 800x480
+--scale aspect       the same picture at 640x480: the shape it had on a monitor
+--scale off          not enlarged, and put on the screen by SDL as in the first
+                     version: 320x200 in the middle
+--res 640 400        draws at 640x400: finer walls, and more than three times the
+                     work. With --scale off this is the first version's default.
+--resf 400 240       draws at 400x240 and shows it doubled, which is the whole panel
+                     with even pixels: a quarter finer than the default for a third
+                     more work. Menus and full-screen pictures are 640x400 in the top
+                     left corner.
+--resf 800 480       draws at 800x480: the most work. Menus and full-screen pictures
+                     stay 640x400, in the top left corner.
+--screen W H         the size of the screen, where SDL cannot tell (the dummy driver)
+--timedemo N         plays demo N (0 to 3) as fast as it will go, prints the frame rate
+                     and ends. The time includes the fade-in at the start of the demo,
+                     which is thirty redraws of the picture and a quarter of a second
+                     of waiting; any key stops it early.
+--showfps            the frame rate in the top left corner while playing
+--nowait             no "Press a key" on the way in
+--tedlevel N         starts in a level: 0 to 9 are the floors of episode 1, 10 to 19 of
+                     episode 2, and so on
+--fix-console        puts the console on the panel back in text mode if a killed game
+                     left it in graphics mode, and does nothing else. For another
+                     login, a timer, or typing blind.
+--help               the rest (joystick, sound rate, configuration directory)
+
+In the environment:
+SDL_NOMOUSE=1          do not look for a mouse
+SDL_FBCON_NEWVT=1      run on a new virtual terminal, as SDL did before the patch
+SDL_FBCON_VTSWITCH=1   let Ctrl+Alt+F1 to F12 switch terminals, as SDL did before
+SDL_FBCON_VERBOSE=     (empty) do not print the "SDL fbcon:" lines
+WOLF3D_NOGUARD=1       do not start the console guard
+SDL_VIDEODRIVER=dummy  no screen at all: for --timedemo without the panel
+WOLF3D_CHECK_PRESENT=1 for tests: read the screen back after every picture and stop
+                       if it is not what was drawn. Slow.
+
+Every run that enlarged the picture says so at the end, for example
+     wolf3d: drawn at 320x200, shown at 640x400 from (80,40)
+
+Every run that drew the 3D view ends with a line such as
+     wolf3d: 1830 frames of the 3D view, 61.0 s of drawing (30.0 fps)
+A frame that follows the one before within a second counts; a longer gap is a menu or a
+level being loaded and is left out. In play the game draws at most 70 frames a second,
+and the demos behind the title screen at most 17.5.
+
+Keys
+====
+Arrows                move and turn
+Ctrl                  fire
+Alt                   strafe (hold, with the left and right arrows)
+Shift                 run
+Space                 open doors, use
+1 to 4                weapons
+Esc                   menu
+Enter, Y, N           select, confirm
+F10, then Y           quit
+Alt+F4                quit at once, without asking
+These are the game's own. Right Ctrl, Right Alt and Right Shift work as the left ones.
+Ctrl+C does nothing while the game runs: the keyboard is in raw mode.
+
+Mouse
+=====
+SDL looks at /dev/input/event0 to event31 when it starts and uses up to four devices
+that report relative X and Y movement and have a left button. It prints one line for
+each, "SDL fbcon: mouse on /dev/input/event1 (name)", or "SDL fbcon: no mouse found".
+Left and right turn, forward and back walk, the left button fires, the right button
+strafes while held, the middle button is "use". Sensitivity is in the Control menu.
+The mouse has to be plugged in before the game starts. One that is unplugged while
+playing is dropped and the game carries on; it is not looked for again.
+SDL as released could not have used a mouse here at all: it reads /dev/input/mice and
+the like, which this kernel does not have (no CONFIG_INPUT_MOUSEDEV), and it refuses to
+start when it finds none.
+
+Sound
+=====
+There is none: the board has no sound device. The game prints "No sound: No available
+audio device" at the end of each run and plays without. Wolf4SDL as it stands ends at
+start-up in that case ("SD_PrepareSound(0): DigiList not initialized!"); that is one
+of the things the patch changes. The sound code is still all there, and ran under the
+emulator with SDL's dummy sound device. If the board ever gets a device that SDL 1.2 can
+open (/dev/dsp), memory becomes the problem: the game converts every sound effect to
+the output rate at start-up. Under the emulator it then asked for 17 MiB at the
+default rate of 44100, which is more than the board has, and 6.4 MiB with
+"--samplerate 11025".
+
+Picture
+=======
+The first version was slow on the board: 6 to 8 frames a second. Where the work went
+was then measured, by building the same sources for the PC and running demo 0 under
+valgrind's cachegrind, which counts instructions and stores. For one frame:
+
+  first version                      instructions   stores to memory
+  640x400, its default                  3,720,000        478,000
+  --resf 800 480                        5,330,000        704,000
+  --res 320 200 (a small picture)       1,180,000        132,000
+
+Of the stores at 640x400, 58 in 100 were SDL turning the whole picture into screen
+pixels, one pixel to a store, every frame, changed or not; 25 in 100 were the walls,
+drawn at four times the original's pixels. On this board, with the panel on, the port
+runs its cache write-through: every store goes straight to the PSRAM. So stores had
+to be a large part of what a frame costs. How large, the board has since said: see
+"What the board says" below. fbDOOM gets its 18 frames a second by drawing 320x200
+and enlarging that as it goes to the screen, two pixels to a store.
+
+This version does the same, and one thing more. The game draws at 320x200 unless --res
+says otherwise. On the way to the screen the picture is enlarged; a copy of what is on
+the screen is kept, the new picture is compared with it four pixels at a time, and
+only what differs is written, two screen pixels to a store (id_vp.cpp). The ceiling,
+the floor, the status bar and anything else that did not change cost a comparison and
+no store. The same demo:
+
+  this version                       instructions   stores to memory   picture
+  (none)                                1,080,000         83,000       640x400 at (80,40)
+  --scale aspect                        1,080,000         85,000       640x480 at (80,0)
+  --scale fill                          1,200,000        101,000       800x480
+  --resf 400 240                        1,450,000        113,000       800x480
+  --res 640 400                         3,440,000        275,000       640x400 at (80,40)
+  --resf 800 480                        4,890,000        397,000       800x480
+  --scale off --res 640 400             3,720,000        478,000       the first version
+
+These are counts on a PC, of x86 code, and they are not times. The board's code was
+counted for three of the rows in another way (the emulator's log of every instruction
+it carries out) and came to 1,065,000, 1,163,000 and 1,436,000 instructions a frame
+for the default, --scale fill and --resf 400 240: within 3 in 100 of the PC's. Stores
+could not be counted that way. One place where they are known to flatter: the PC
+clears the ceiling and floor some 20 bytes to a store and the board 4, which is about
+9,000 more stores a frame at 320x200 than the table shows, and more in proportion at
+the larger sizes. The default now takes under a fifth of the stores and under a third
+of the instructions that it took, and --scale fill a seventh of the stores of the
+first version's --resf 800 480.
+
+What the board says
+-------------------
+Three of the rows have been timed on the board, with --timedemo 0:
+
+                                     frames a second    ms a frame
+  (none)                                  35.3              28.3
+  --scale fill                            29.7              33.7
+  --scale off --res 640 400                8.1             123.5
+
+Suppose a frame costs so much for each instruction and so much for each store. The
+first and the third row then give 16 ns an instruction and 135 ns a store, and the
+second is a check on that: it should take 32.7 ms, and took 33.7. So the counts are a
+fair guide to this board, and both things cost. In the default mode a frame is about
+17 ms of instructions and 11 ms of stores; in the first version's it was 59 and 64.
+
+16 ns is five ticks of a 320 MHz clock for an average instruction, which is a lot,
+and the counts do not say where it goes. Loads that miss the cache are the likely
+place: the picture that is compared and the copy it is compared with are 64 KB each,
+and the data cache is 64 KB in all. The stores of the ceiling and floor that the PC
+undercounts are in there too. tools/storecost.c is a small program for the board
+that times loads and stores of each kind on their own; TEST-PLAN.txt has how to run
+it. It has run under the emulator only, where it shows nothing of interest.
+
+By those two figures the rows that have not been timed come to
+
+                                     frames a second
+  --scale aspect                          35
+  --resf 400 240                          26
+  --res 640 400                           11
+  --resf 800 480                           7.6
+  first version, --resf 800 480            5.6     (6.2 measured, in play)
+
+These are worked out, not measured, and the timed demo includes a fade at its start
+that costs the faster modes a few in 100. What they say is plain enough: the two ways
+of filling the panel from a small picture give 25 frames a second or more, and
+drawing at the panel's own 800x480 does not come near. Every wall pixel drawn is a
+store and a handful of instructions, the walls at 800x480 are six times the pixels of
+the walls at 320x200, and nothing in how the picture is put on the screen changes
+that.
+
+So for a full panel there are two choices. --scale fill stretches the 320x200 picture,
+menus included, with pixels two or three panel pixels wide by turns. --resf 400 240
+draws a wider and finer view and doubles it exactly, with the menus in the top left
+corner at 640x400.
+
+--scale fill is also the first mode in which menus and full-screen pictures fill the
+panel: they are part of the 320x200 picture that is stretched. The picture is then
+wider than it was drawn (5:3 from 8:5), and its pixels are two or three panel pixels
+wide by turns. --scale aspect has the shape the game had on a 4:3 monitor, with pixels
+of even width.
+
+The picture is written straight into the visible screen. There is no vsync and no
+second page, so tearing is possible, as in fbDOOM. A fade redraws all of it at each of
+its thirty steps, as before, but each step is now a little over half the stores it was.
+
+A correction to the first version of this file. It gave the cost of 640x400 as 1.7
+times that of 320x200 and of 800x480 as 2.0 times, from how long the emulator took.
+The emulator's time is mostly its own overhead per frame, and the counts above are
+what should have been measured: 3.2 and 4.5 times the instructions, 3.6 and 5.3 times
+the stores.
+
+The Zb build
+============
+The board's device tree lists three extensions for the processor that Linux runs on,
+beyond the RV32IMAC that the board's toolchain builds for: Zba (shift and add, for
+working out addresses), Zbb (minimum and maximum, counting bits, swapping bytes,
+widening) and Zbs (single bits). Nothing on the board uses them. wolf3d-korvo-zb is
+the game, SDL and SDL_mixer compiled with
+     -march=rv32imac_zicsr_zifencei_zba_zbb_zbs -mabi=ilp32
+The C library and the compiler's own routines that are linked in are the toolchain's,
+without them. The compiler found about 2,900 places for such an instruction in the
+binary, nearly half of them sh2add and sh1add.
+
+What it saves was counted in the emulator's log of every instruction it carries out,
+over a whole run of --timedemo 0, start-up included:
+
+                         wolf3d-korvo    wolf3d-korvo-zb    fewer, in 100
+  (none)                  736,142,113      714,206,666           3.0
+  --scale fill            803,563,253      772,824,923           3.8
+  --resf 400 240          992,303,789      963,448,679           2.9
+
+Stores were not counted for it; nothing in these extensions is about stores, so they
+should be the same. By the two figures from the board, instructions are about three
+fifths of a frame, so this should be worth some 2 in 100: half a frame a second at
+30. That is a guess until the board has run it, and not worth much either way.
+
+A processor without one of the three would stop at the first such instruction it
+came to, wherever that was. So this build tries one instruction of each kind before
+it does anything else, and if one is refused it prints
+     wolf3d: this build is for a processor with Zbb, and this one does not have it.
+     Use the build without "zb" in its name.
+and ends with status 1, with the console as it was. "Before anything else" turned out
+to mean before the constructors of the program's static objects, which run ahead of
+main(): the first such instruction is in one of them, the OPL emulator's tables. This
+was tried under the emulator with each of the three turned off in turn, and is a case
+in the tests. --fix-console in this build makes the same check, so on such a
+processor that is a job for the other build too.
+
+Memory
+======
+The game asks the kernel for 1.8 MiB while playing a demo in its default mode and with
+--scale fill, and 2.2 MiB with --res 640 400 (the first version: 2.0 MiB); 1.5 MiB of
+that is VSWAP.WL6, which it reads whole. The binary adds 0.57 MiB of code and 0.33 MiB
+of data. That is from the emulator's system call trace, not from the board.
+
+The console
+===========
+While it runs, the game has the panel's console in graphics mode and the keyboard in
+raw mode. What puts them back, and when:
+
+* Any ordinary end (Quit, Alt+F4, an error, the end of a timed demo): SDL, before
+  anything is printed. Messages from while the game ran are printed after that.
+* A signal that would end the game (SEGV, BUS, ILL, FPE, ABRT, TERM, HUP, INT, QUIT,
+  PIPE, USR1, USR2), or a crash from the stack running out: SDL's frame buffer driver,
+  in the signal handler, with system calls only. So "killall wolf3d" is safe. SIGALRM
+  is ignored, as SDL sets it. If the terminal has been hung up (the shell that owned
+  it has gone), the handler opens it again to put it back.
+* exit() from anywhere without SDL being told: the same code, from an atexit()
+  function.
+* The game being killed outright (kill -9, or the kernel when memory runs out) or
+  ending through _exit(): the console guard. This is a second process, the same
+  binary started with --console-guard, that holds one end of a pipe and does nothing
+  until the other end closes, which it does when the game is gone however that
+  happened. It then looks at the console and puts it back if it is still in graphics
+  mode or raw. Until then it sleeps. Under the emulator it asked the kernel for no
+  memory at all; what it holds on the board (a stack and the few pages of the binary
+  it runs) has not been measured.
+* By hand, with no game running: /root/wolf3d --fix-console. From another login, or
+  from a timer started on the panel before the game, as step 3 of TEST-PLAN.txt does.
+  It puts right graphics mode, a raw keyboard and SDL's terminal settings on the
+  terminal that is on the screen.
+
+What none of this covers:
+* "killall -9 wolf3d" kills the guard with the game. Kill the game alone.
+* A game that hangs without ending. No key reaches it. Only a timer started
+  beforehand or another login can end it; then the above applies.
+* After a kill -9, a shell that read the terminal settings before the guard put them
+  back keeps restoring the game's: programs then do not show what is typed and Ctrl+C
+  does nothing. "stty sane" puts that right, and so does --fix-console. The guard runs
+  at a real-time priority to get there first; on one processor it should. Not seen on
+  the board either way.
+* From another login or with SDL_FBCON_NEWVT, SDL waits for the screen to reach its new
+  terminal, and waits for ever if another program has the screen in graphics mode. That
+  is SDL as released, and cannot happen when the game is started on the panel.
+
+The game stays on the virtual terminal it was started from (tty1). SDL as released
+would have moved it to a new one, tty2, and back at the end.
+
+What the patches change
+=======================
+SDL (725 lines added, 39 removed, five files; all in the fbcon driver but one line):
+* One request to find out that the frame buffer has a single mode, in place of sixty.
+  This matters more than it sounds: in text mode the kernel redraws the whole console
+  after each request that succeeds.
+* Start-up without a mouse.
+* Mice on /dev/input/eventN (new file).
+* The game stays on its own virtual terminal.
+* Signals and exit() put the console back, as above, and SIGINT and SIGTERM work again
+  once SDL has quit.
+* A video mode that cannot be set leaves the console in text mode for the message.
+* Ctrl+Alt+Fn no longer switches terminals unless asked: it is fire, strafe and a
+  function key.
+* Multimedia keys (keycodes above 127) are no longer read as three other keys.
+* Only the keymaps the kernel has are fetched.
+* A small surface no longer takes the memory of a screen-wide one.
+* The whole screen is cleared at the end, not just the top 400 lines.
+* A cast, from SDL's own later history, so that it compiles with GCC 15.
+
+What that comes to at start-up, counted against the fake console (tests/results.txt):
+
+                                   as released     patched
+  mode requests to the kernel      62              3
+  console redraws caused           61              2
+  keymap requests                  65,536          2,048
+  virtual terminal switches        2               0
+  starts without /dev/input/mice   no              yes
+
+The game (1,247 lines added, 50 removed, seventeen files):
+* Carries on with no sound device.
+* Draws at 320x200 and enlarges the picture itself on the way to the screen, writing
+  only what changed (new file, id_vp.cpp). See "Picture" above.
+* Draws straight into the frame buffer. As released it asks for double buffering, which
+  this frame buffer cannot do, and SDL then keeps a second copy of the screen and
+  copies it across on every frame.
+* Finds data files with upper case names.
+* --timedemo, --showfps, and the frame rate line at the end.
+* Puts the console back before it prints an error; keeps other messages for the end.
+* The console guard and --fix-console (new file, wl_fbcon.cpp).
+* In a build for Zba, Zbb or Zbs, a check before anything else that the processor has
+  them. It is not compiled into the plain build.
+
+Sources
+=======
+SDL 1.2.15       https://www.libsdl.org/release/SDL-1.2.15.tar.gz
+                 sha256 d6d316a793e5e348155f0dd93b979798933fb98aa1edebcc108829d6474aad00
+SDL_mixer 1.2.12 https://www.libsdl.org/projects/SDL_mixer/release/SDL_mixer-1.2.12.tar.gz
+                 sha256 1644308279a975799049e4826af2cfc787cad2abb11aa14562e402521f86992a
+                 not patched; every music format is turned off
+Wolf4SDL         https://github.com/ioan-chera/Wolf4SDL, branch wolf4sdl
+                 commit 51b3694e58bad8c9be9cddba720f86a4749d469c (2011-10-08)
+                 a git copy of the Wolf4SDL svn repository; later forks need SDL 2,
+                 which has no plain frame buffer driver
+
+Licences
+========
+The game is built from id Software's source under the GNU GPL version 2 (Wolf4SDL
+offers that or id's older licence), with the DOSBox OPL emulator, also GPL, in place of
+the MAME one: "GPL=1" in the build. SDL is LGPL 2.1 or later, SDL_mixer is under the
+zlib licence, musl under the MIT licence, and the compiler's libraries have GCC's
+runtime exception. The changes to SDL here are offered under the LGPL and the changes
+to the game under the GPL. Whoever publishes the binary has to make the source it was
+built from available with it: the three sources above and the two patches. build.sh
+is the recipe, and is also what lets someone relink against another SDL, which the LGPL
+asks for.
+
+Toolchain
+=========
+The board's own Buildroot 2026.08 toolchain: GCC 15.3.0, riscv32-buildroot-linux-musl,
+musl 1.2.6, rv32imac, ilp32 (soft-float). It is used by absolute path from the finished
+build in ~/esp32-s31-linux-main. Nothing in that tree is changed. -O2 throughout, as
+Buildroot builds the rest of the board's software. The Zb build uses the same
+compiler and the same libraries with a wider -march for its own code.
+
+Build (WSL2 Debian)
+===================
+     bash build.sh [WORKDIR]
+WORKDIR defaults to ~/wolf-scratch/build. It needs curl, git, patch and make, and
+fetches about 10 MB. It checks the two tarballs against the checksums above, applies
+the patches, builds the two libraries into WORKDIR/prefix and the game against them,
+and leaves WORKDIR/wolf3d-korvo. It takes about half a minute on this PC.
+
+     VARIANT=zb bash build.sh [WORKDIR]
+does the same with "-march=rv32imac_zicsr_zifencei_zba_zbb_zbs -mabi=ilp32" added to
+the compiler's flags for the two libraries and the game, in ~/wolf-scratch/build-zb
+unless told otherwise, and leaves WORKDIR/wolf3d-korvo-zb.
+
+Each was run twice from nothing, in two different directories, and gave the same file
+both times, byte for byte: the checksums at the top.
+
+What it does, for doing it by hand:
+* SDL and SDL_mixer: config.sub and config.guess in build-scripts/ are replaced with
+  current ones (Buildroot's, from support/gnuconfig); the ones in the tarballs are from
+  2012 and do not know riscv32. Then ./configure --host=riscv32-buildroot-linux-musl
+  --disable-shared with CFLAGS="-O2 -std=gnu99", and for SDL every video driver off
+  but fbcon and dummy, no assembly, and --enable-clock_gettime so that the game's clock
+  does not jump when the board's clock is set. The full list is in build.sh.
+* The game: "make GPL=1" with CXX and CC set, CFLAGS="" and LDFLAGS="-static" in the
+  environment (as arguments to make they would replace the Makefile's own), and
+  LDFLAGS_SDL="-L.../prefix/lib -lSDL_mixer -lSDL -lpthread -lm": in a static link
+  SDL_mixer has to come before SDL. Then strip.
+* version.h is left as it is: GOODTIMES and CARMACIZED, which is this data.
+
+Tests (under qemu-riscv32-static, not on the board)
+===================================================
+     bash tests/run-tests.sh
+It needs the trees that build.sh leaves in WORKDIR, python3, and a directory with the
+eight WL6 files (DATA; they are not part of this). Start it in the foreground and not
+under nohup: a signal that is ignored when it starts stays ignored in the programs it
+tests, which is right, and the cases for that signal then have less to check. It takes
+about half an hour, most of it the broken copies. The last run is in
+tests/results.txt: 89 cases and 36 broken copies, 125 checks, all passed. The 89
+cases were then run against the Zb build, with ARCH set as the top of run-tests.sh
+says, and all passed: tests/results-zb.txt. The broken copies were not built a second
+time for it; they test the tests.
+
+* fakefb.c is the fake console. The files that talk to the console (three of SDL's, one
+  of the game's) are compiled as they are, with open(), ioctl(), tcsetattr() and eight
+  more renamed to its functions. Every other object in the test programs is the one in
+  the board's binary. The fake frame buffer answers as simplefb does in the board's
+  kernel: it takes any mode request and returns the mode it has. The fake terminals
+  refuse to switch while one is in graphics mode or switching is locked, as the kernel
+  does. Their state is kept in a file, so it can be read after the program has gone,
+  whatever ended it, and so that the console guard, a second process, sees the same
+  console. How each call should answer was read from the board's kernel source.
+* sdlprobe.c is a small SDL program: the driver without the game. With it: where the
+  picture lands for four sizes (every pixel of the fake screen is looked at), a size
+  that does not fit, the start-up counts in the table above, keys (including a
+  multimedia key while Ctrl is held, and Ctrl+Alt+F2), keys left unread, mouse
+  movement, buttons and wheel, a mouse that goes away, SDL_NOMOUSE, a program that
+  returns or calls exit() without SDL_Quit(), SIGTERM after SDL_Quit(), a start from a
+  terminal that is not a console (as root and not), each of six system calls made to
+  fail, each signal, and a signal after the terminal has been hung up.
+* The picture. In every case below the game reads the screen back after each picture
+  it puts there and stops if any pixel is not the one it drew, worked out from the
+  colours and the picture afresh (WOLF3D_CHECK_PRESENT). Beside that: a still screen
+  is captured unscaled, as SDL draws it, and enlarged in each of the three ways, and
+  a script works out on its own what every one of the 384,000 pixels of the enlarged
+  screen has to be; drawn at 640x400 and at 800x480 the screen has to be the same,
+  byte for byte, as SDL's own code makes it; and the player is killed with the debug
+  keys, which is a fizzle fade to red and one back into the level, in two modes.
+* The game: play in six picture modes with a screen shot of each, the sign-on screen,
+  title and menus, Quit from the menu, a timed demo to its end and stopped early, each
+  signal, kill -9 with and without the guard, from a terminal that is not a console,
+  half way into graphics mode, and with the screen on another terminal,
+  --fix-console from another login and as a background job of the dead terminal, a
+  store through a null pointer, abort(), a stack overflow, exit() and _exit() from
+  inside, a data file that is missing (two ways the game ends), a mode that does not
+  fit, graphics mode refused, and the mouse turning the view. After each one the
+  console has to be as it was, by the steps that put it back and in their order, and
+  nothing may have been printed while it was in graphics mode.
+* Then thirty-six broken copies: one thing taken out of the source or put wrong each
+  time (the signal handler, its stack, the atexit() function, the guard; a store in
+  each of the row loops, where the picture is sampled, the copy of the screen, and so
+  on). Each has to build, and at least one case has to fail for each. They all do.
+* Two things the fake console cannot show and that were read from the kernel source
+  only: that the guard gets to the terminal settings before the shell does, and that
+  a guard which could not be started does not take the game with it.
+* The binary itself: --help, no data, no console, all four demos to the end with the
+  real data and no sound device (691, 1899, 1140 and 1656 frames, the same every
+  time), one with SDL's dummy sound device, and one in each of the three enlarged
+  modes into memory, with the read-back check on. And the demo on an emulated
+  processor without Zba, without Zbb and without Zbs: the plain build has to play it,
+  and the Zb build has to name the missing one and end with status 1.
+
+Screen shots from the tests are left in WORKDIR/tests/shots. They are pictures of the
+game, so they are not kept here.
+
+Not yet checked on the board
+============================
+Known from the board: the first version starts, puts a picture on the panel with and
+without --resf 800 480, and manages 6.2 frames a second with it; the second version
+plays the timed demo to its end in three modes, at the rates given at the top. Nothing
+below has been reported yet, for either version.
+* How the picture modes look: whether anything is left behind when the view moves,
+  the fades, the fizzle fade when the player dies.
+* The frame rates of --scale aspect, --resf 400 240, --res 640 400, --resf 800 480
+  and of the game with no screen at all.
+* What a load and a store cost, each on its own: tools/storecost.c.
+* The Zb build: that the processor carries out the three kinds of instruction (the
+  device tree lists them, and the build tries one of each before anything else), and
+  whether it is any faster.
+* Tearing, and whether the sign-on and menu screens fade in and out cleanly. Each step
+  of a fade redraws the whole picture.
+* The keys, on the real keyboard through the real kernel keymap.
+* The mouse: finding it, and how turning feels.
+* That the console comes back cleanly after each kind of exit, and that the lines
+  printed at the end can be read. All of this was tested against the fake console only.
+* The console guard: that it starts (it runs /proc/self/exe), that it is not in the
+  way, and that it does its job after a kill -9. Its real-time priority is untried.
+* Memory: that 2 MiB and the binary fit beside everything else on the board.
+* A USB game controller. SDL's joystick code is in the binary and would look for one;
+  none of that was tested. "--joystick -1" turns it off if it causes trouble.

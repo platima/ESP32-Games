@@ -1,0 +1,1078 @@
+SDL 1.2.15: the frame buffer console driver on a board with a fixed-mode
+frame buffer, event devices only, and one console
+
+Against the SDL-1.2.15.tar.gz release from libsdl.org
+(sha256 d6d316a793e5e348155f0dd93b979798933fb98aa1edebcc108829d6474aad00).
+Apply with: patch -p1 < SDL-1.2.15-korvo-fbcon.patch
+
+Written for the ESP32-S31-Korvo-1 running esp32-s31-linux: Linux 7.2.7 with
+simplefb (800x480, RGB565), no mousedev driver, and a shell on tty1 that is
+the only way into the machine.  Nothing in it is specific to that board.
+The changes to SDL are offered under SDL's own licence, the GNU LGPL 2.1 or
+later.
+
+src/stdlib/SDL_iconv.c
+    The iconv() call is cast so that it compiles with GCC 14 and later.
+    This is the change from SDL-1.2 commit 8a8135d9, as Buildroot carries
+    it (package/sdl/0004-src-stdlib-SDL_iconv.c-fix-types-mismatch.patch).
+
+src/video/fbcon/SDL_fbvideo.c
+  * A frame buffer that has only one mode is recognised with one request,
+    and that mode is the only one listed.  Before, some sixty requests were
+    made to find that out, and in text mode the kernel redraws the whole
+    console after each one that succeeds.
+  * No mouse is no longer an error.  SDL_NOMOUSE now means: do not look for
+    one.
+  * If the video mode cannot be set, the console is put back in text mode
+    before the error is returned, so that the program's message can be read.
+  * A hardware surface that there is no video memory for no longer keeps the
+    pitch of the screen.  It was then given ordinary memory of its height
+    times that pitch: 51,200 bytes for a 24x32 picture on a screen 800 wide.
+  * On the way out all of the screen is cleared, not only as many lines as
+    the program asked for: a smaller picture is centred, and its last lines
+    were left on the screen.
+  * On the way out SDL's SIGINT and SIGTERM handlers are taken out, as SDL
+    means to do itself: with the handlers below in the way it did not.
+
+src/video/fbcon/SDL_fbevents.c
+  * A program started on a virtual terminal stays on it, as one that is not
+    root always has.  Before, root was moved to a new terminal.
+    SDL_FBCON_NEWVT asks for that again; a program started from elsewhere
+    (ssh, a serial line) still gets it, as it has no terminal of its own to
+    use.
+  * While the console is in graphics mode, the signals that end a program
+    are caught (SEGV, BUS, ILL, FPE, ABRT, TERM, HUP, INT, QUIT, PIPE, ALRM,
+    USR1, USR2; not one that is being ignored).  The console is put back
+    with system calls only, on a stack of its own and with other signals
+    held off, and then the signal does what it does.  An exit() without
+    SDL_Quit() is covered by atexit().  SIGINT and SIGTERM therefore end the
+    program at once: no SDL_QUIT event.
+  * If the terminal has been hung up, so that the descriptor SDL holds
+    answers EIO, it is opened again by its number to be put back.
+  * If the terminal settings or the keyboard mode cannot be read after a
+    move to a new terminal, the screen is moved back.
+  * Ctrl-Alt-Fn only switches terminals if SDL_FBCON_VTSWITCH is set.
+  * The three bytes that the kernel sends for a keycode above 127 are
+    skipped.  They were read as three keys.
+  * Keymaps that the kernel does not have are not asked for key by key:
+    2,048 requests at start-up in place of 65,536, and 128 KB of memory
+    that is no longer touched.
+  * SDL_FBCON_VERBOSE makes the driver say on stderr which terminal, mouse
+    and mode it uses, before it leaves text mode.
+
+src/video/fbcon/SDL_fbevdev.c (new), SDL_fbevents_c.h
+    Mice on /dev/input/eventN, for kernels without /dev/input/mice: up to
+    four devices that report relative X and Y and have a left button.
+    SDL_MOUSEDRV=EVDEV asks for these only; they are looked at first in any
+    case, unless SDL_MOUSEDRV or SDL_MOUSEDEV names something else.
+
+diff --git a/src/stdlib/SDL_iconv.c b/src/stdlib/SDL_iconv.c
+index fa56a99..369f688 100644
+--- a/src/stdlib/SDL_iconv.c
++++ b/src/stdlib/SDL_iconv.c
+@@ -43,12 +43,10 @@ size_t SDL_iconv(SDL_iconv_t cd,
+                  const char **inbuf, size_t *inbytesleft,
+                  char **outbuf, size_t *outbytesleft)
+ {
+-	size_t retCode;
+-#ifdef ICONV_INBUF_NONCONST
+-	retCode = iconv(cd, (char **)inbuf, inbytesleft, outbuf, outbytesleft);
+-#else
+-	retCode = iconv(cd, inbuf, inbytesleft, outbuf, outbytesleft);
+-#endif
++	/* iconv's second parameter may or may not be `const char const *` depending on the
++	   C runtime's whims. Casting to void * seems to make everyone happy, though. */
++	const size_t retCode = iconv((iconv_t) ((uintptr_t) cd), (void *)inbuf, inbytesleft, outbuf, outbytesleft);
++
+ 	if ( retCode == (size_t)-1 ) {
+ 		switch(errno) {
+ 		    case E2BIG:
+diff --git a/src/video/fbcon/SDL_fbevdev.c b/src/video/fbcon/SDL_fbevdev.c
+new file mode 100644
+index 0000000..e8b0c30
+--- /dev/null
++++ b/src/video/fbcon/SDL_fbevdev.c
+@@ -0,0 +1,307 @@
++/*
++    SDL - Simple DirectMedia Layer
++    Copyright (C) 1997-2012 Sam Lantinga
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Lesser General Public
++    License as published by the Free Software Foundation; either
++    version 2.1 of the License, or (at your option) any later version.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Lesser General Public License for more details.
++
++    You should have received a copy of the GNU Lesser General Public
++    License along with this library; if not, write to the Free Software
++    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++*/
++#include "SDL_config.h"
++
++/* Mice read from the kernel's event devices, /dev/input/eventN.
++
++   The rest of this driver wants a device that speaks a mouse protocol:
++   gpm, /dev/input/mice, /dev/psaux.  The last two come from the kernel's
++   mousedev driver, and a kernel built without it (CONFIG_INPUT_MOUSEDEV)
++   has only the event devices.  Up to FB_MAX_MICE of them are read here,
++   and what they report is handed to FB_vgamousecallback() like the
++   packets of any other mouse.  This file is not part of SDL 1.2.15. */
++
++#include <errno.h>
++#include <fcntl.h>
++#include <stdio.h>
++#include <string.h>
++#include <unistd.h>
++#include <sys/ioctl.h>
++#include <linux/input.h>
++
++#include "SDL_stdinc.h"
++#include "SDL_fbvideo.h"
++#include "SDL_fbevents_c.h"
++
++#define FB_MAX_MICE	4
++#define FB_MAX_EVDEV	32	/* event0 to event31 are looked at */
++
++/* SDL adds movement to the position of the pointer in 16 bits.  This is
++   far more than a mouse sends between two calls, and small enough for the
++   sum to stay in range on any screen, whatever a device reports. */
++#define FB_MOUSE_MAX	0x3fff
++
++/* The buttons as FB_vgamousecallback() wants them */
++#define FB_BUTTON_LEFT		0x04
++#define FB_BUTTON_MIDDLE	0x02
++#define FB_BUTTON_RIGHT		0x01
++#define FB_BUTTON_WHEELUP	0x08
++#define FB_BUTTON_WHEELDOWN	0x10
++
++/* An event as the kernel writes it: the time as two longs, then the type,
++   the code and the value.  struct input_event from <linux/input.h> is not
++   used for reading: where time_t is 64 bits and long is 32, it only has
++   this size if the C library says so in the way that header expects. */
++struct fb_input_event {
++	unsigned long sec;
++	unsigned long usec;
++	Uint16 type;
++	Uint16 code;
++	Sint32 value;
++};
++typedef char fb_input_event_size_check
++	[(sizeof(struct fb_input_event) == (sizeof(long) == 4 ? 16 : 24)) ? 1 : -1];
++
++static struct fb_mouse {
++	int fd;
++	int buttons;	/* FB_BUTTON_LEFT, _MIDDLE and _RIGHT that are down */
++	int have;	/* bytes of an unfinished event left by the last read */
++	unsigned char buf[16 * sizeof(struct fb_input_event)];
++} fb_mice[FB_MAX_MICE];
++
++static int fb_nmice = 0;
++
++/* The kernel's bitmaps are arrays of unsigned long */
++#define FB_LONG_BITS		(8 * sizeof(unsigned long))
++#define FB_BITMAP_LONGS(n)	(((n) + FB_LONG_BITS - 1) / FB_LONG_BITS)
++
++static int fb_test_bit(const unsigned long *map, int n)
++{
++	return (int)((map[n / FB_LONG_BITS] >> (n % FB_LONG_BITS)) & 1);
++}
++
++/* A mouse reports relative X and Y and has a left button */
++static int fb_is_mouse(int fd)
++{
++	unsigned long ev[FB_BITMAP_LONGS(EV_CNT)];
++	unsigned long rel[FB_BITMAP_LONGS(REL_CNT)];
++	unsigned long key[FB_BITMAP_LONGS(KEY_CNT)];
++
++	memset(ev, 0, sizeof(ev));
++	memset(rel, 0, sizeof(rel));
++	memset(key, 0, sizeof(key));
++
++	if ( (ioctl(fd, EVIOCGBIT(0, sizeof(ev)), ev) < 0) ||
++	     !fb_test_bit(ev, EV_REL) || !fb_test_bit(ev, EV_KEY) ) {
++		return 0;
++	}
++	if ( (ioctl(fd, EVIOCGBIT(EV_REL, sizeof(rel)), rel) < 0) ||
++	     (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key)), key) < 0) ) {
++		return 0;
++	}
++	return fb_test_bit(rel, REL_X) && fb_test_bit(rel, REL_Y) &&
++	       fb_test_bit(key, BTN_LEFT);
++}
++
++/* Find the mice.  Returns the descriptor of the first one, or -1. */
++int FB_EvdevOpenMice(void)
++{
++	char path[32];
++	char name[64];
++	int i, fd;
++
++	FB_EvdevCloseMice();
++
++	for ( i=0; (i < FB_MAX_EVDEV) && (fb_nmice < FB_MAX_MICE); ++i ) {
++		SDL_snprintf(path, SDL_arraysize(path), "/dev/input/event%d", i);
++		fd = open(path, O_RDONLY | O_NONBLOCK, 0);
++		if ( fd < 0 ) {
++			continue;
++		}
++		if ( !fb_is_mouse(fd) ) {
++			close(fd);
++			continue;
++		}
++
++		memset(name, 0, sizeof(name));
++		if ( ioctl(fd, EVIOCGNAME(sizeof(name) - 1), name) < 0 ) {
++			SDL_strlcpy(name, "?", sizeof(name));
++		}
++		FB_Verbose("mouse on %s (%s)", path, name);
++
++		fb_mice[fb_nmice].fd = fd;
++		fb_mice[fb_nmice].buttons = 0;
++		fb_mice[fb_nmice].have = 0;
++		++fb_nmice;
++	}
++	return (fb_nmice > 0) ? fb_mice[0].fd : -1;
++}
++
++void FB_EvdevCloseMice(void)
++{
++	while ( fb_nmice > 0 ) {
++		close(fb_mice[--fb_nmice].fd);
++	}
++}
++
++/* The buttons that are down on any of the mice */
++static int fb_all_buttons(void)
++{
++	int i, buttons = 0;
++
++	for ( i=0; i<fb_nmice; ++i ) {
++		buttons |= fb_mice[i].buttons;
++	}
++	return buttons;
++}
++
++/* Add to a movement total, staying within FB_MOUSE_MAX either way */
++static int fb_mouse_move(int total, int value)
++{
++	if ( value > FB_MOUSE_MAX ) {
++		value = FB_MOUSE_MAX;
++	} else if ( value < -FB_MOUSE_MAX ) {
++		value = -FB_MOUSE_MAX;
++	}
++	total += value;
++	if ( total > FB_MOUSE_MAX ) {
++		total = FB_MOUSE_MAX;
++	} else if ( total < -FB_MOUSE_MAX ) {
++		total = -FB_MOUSE_MAX;
++	}
++	return total;
++}
++
++/* Pass on the movement that has been added up, if there is any */
++static void fb_mouse_flush(int *dx, int *dy)
++{
++	if ( *dx || *dy ) {
++		FB_vgamousecallback(fb_all_buttons(), 1, *dx, *dy);
++		*dx = *dy = 0;
++	}
++}
++
++/* The kernel dropped events, so a button change may be missing: ask which
++   buttons are down now. */
++static void fb_mouse_sync(struct fb_mouse *m)
++{
++	unsigned long key[FB_BITMAP_LONGS(KEY_CNT)];
++
++	memset(key, 0, sizeof(key));
++	m->buttons = 0;
++	if ( ioctl(m->fd, EVIOCGKEY(sizeof(key)), key) >= 0 ) {
++		if ( fb_test_bit(key, BTN_LEFT) ) {
++			m->buttons |= FB_BUTTON_LEFT;
++		}
++		if ( fb_test_bit(key, BTN_MIDDLE) ) {
++			m->buttons |= FB_BUTTON_MIDDLE;
++		}
++		if ( fb_test_bit(key, BTN_RIGHT) ) {
++			m->buttons |= FB_BUTTON_RIGHT;
++		}
++	}
++}
++
++static void fb_mouse_event(struct fb_mouse *m, const struct fb_input_event *ev,
++                           int *dx, int *dy)
++{
++	int bit;
++
++	if ( ev->type == EV_REL ) {
++		if ( ev->code == REL_X ) {
++			*dx = fb_mouse_move(*dx, ev->value);
++		} else if ( ev->code == REL_Y ) {
++			*dy = fb_mouse_move(*dy, ev->value);
++		} else if ( (ev->code == REL_WHEEL) && (ev->value != 0) ) {
++			/* One turn of the wheel is a button that goes down
++			   and comes up again, as for an IMPS/2 mouse */
++			fb_mouse_flush(dx, dy);
++			bit = (ev->value > 0) ? FB_BUTTON_WHEELUP : FB_BUTTON_WHEELDOWN;
++			FB_vgamousecallback(fb_all_buttons() | bit, 1, 0, 0);
++			FB_vgamousecallback(fb_all_buttons(), 1, 0, 0);
++		}
++	} else if ( ev->type == EV_KEY ) {
++		switch ( ev->code ) {
++		    case BTN_LEFT:   bit = FB_BUTTON_LEFT;   break;
++		    case BTN_MIDDLE: bit = FB_BUTTON_MIDDLE; break;
++		    case BTN_RIGHT:  bit = FB_BUTTON_RIGHT;  break;
++		    default: return;
++		}
++		/* Movement from before the button changed goes first */
++		fb_mouse_flush(dx, dy);
++		if ( ev->value ) {
++			m->buttons |= bit;
++		} else {
++			m->buttons &= ~bit;
++		}
++		FB_vgamousecallback(fb_all_buttons(), 1, 0, 0);
++	} else if ( (ev->type == EV_SYN) && (ev->code == SYN_DROPPED) ) {
++		fb_mouse_flush(dx, dy);
++		fb_mouse_sync(m);
++		FB_vgamousecallback(fb_all_buttons(), 1, 0, 0);
++	}
++}
++
++/* Read everything that is waiting on one mouse, without blocking.
++   Returns 0 if the mouse has gone (unplugged, for example). */
++static int fb_mouse_drain(struct fb_mouse *m)
++{
++	struct fb_input_event ev;
++	int dx = 0, dy = 0;
++	int n, off, room;
++	int alive = 1;
++
++	for ( ; ; ) {
++		room = (int)sizeof(m->buf) - m->have;
++		n = (int)read(m->fd, m->buf + m->have, room);
++		if ( (n < 0) && (errno == EINTR) ) {
++			continue;
++		}
++		if ( (n < 0) && (errno == EAGAIN) ) {
++			break;
++		}
++		if ( n <= 0 ) {
++			alive = 0;
++			break;
++		}
++
++		/* Handle the whole events, and keep the start of an
++		   unfinished one for the next read */
++		m->have += n;
++		for ( off = 0; off + (int)sizeof(ev) <= m->have; off += (int)sizeof(ev) ) {
++			memcpy(&ev, m->buf + off, sizeof(ev));
++			fb_mouse_event(m, &ev, &dx, &dy);
++		}
++		m->have -= off;
++		memmove(m->buf, m->buf + off, m->have);
++
++		/* A read that did not fill the buffer took all there was */
++		if ( n < room ) {
++			break;
++		}
++	}
++	fb_mouse_flush(&dx, &dy);
++	return alive;
++}
++
++/* Read what is waiting on every mouse.  One that has gone is dropped, and
++   its buttons are let go. */
++void FB_EvdevPumpMice(void)
++{
++	int i;
++
++	for ( i=0; i<fb_nmice; ++i ) {
++		if ( !fb_mouse_drain(&fb_mice[i]) ) {
++			close(fb_mice[i].fd);
++			fb_mice[i] = fb_mice[--fb_nmice];
++			--i;
++			FB_vgamousecallback(fb_all_buttons(), 1, 0, 0);
++		}
++	}
++}
+diff --git a/src/video/fbcon/SDL_fbevents.c b/src/video/fbcon/SDL_fbevents.c
+index 5e369a4..c4e52d3 100644
+--- a/src/video/fbcon/SDL_fbevents.c
++++ b/src/video/fbcon/SDL_fbevents.c
+@@ -31,6 +31,10 @@
+ #include <fcntl.h>
+ #include <errno.h>
+ #include <limits.h>
++#include <signal.h>
++#include <stdarg.h>
++#include <stdlib.h>
++#include <string.h>
+ 
+ /* For parsing /proc */
+ #include <dirent.h>
+@@ -82,6 +86,17 @@ static void FB_vgainitkeymaps(int fd)
+ 
+ 	/* Load all the keysym mappings */
+ 	for ( map=0; map<NUM_VGAKEYMAPS; ++map ) {
++		/* The kernel answers K_NOSUCHMAP for the first key of a map
++		   that it does not have, and it has only a handful of the 256.
++		   Skip those: asking for their other 255 keys is some 64,000
++		   system calls for nothing, and clearing them touches 128 KB
++		   of a table that is static and so zero already. */
++		entry.kb_table = map;
++		entry.kb_index = 0;
++		if ( (ioctl(fd, KDGKBENT, &entry) == 0) &&
++		     (entry.kb_value == K_NOSUCHMAP) ) {
++			continue;
++		}
+ 		SDL_memset(vga_keymap[map], 0, NR_KEYS*sizeof(Uint16));
+ 		for ( i=0; i<NR_KEYS; ++i ) {
+ 			entry.kb_table = map;
+@@ -147,33 +162,229 @@ static void FB_vgainitkeymaps(int fd)
+ 	}
+ }
+ 
++/* Says what the driver found, on stderr, if SDL_FBCON_VERBOSE is set to
++   anything but nothing or 0.  Only called while the console is still in
++   text mode. */
++void FB_Verbose(const char *fmt, ...)
++{
++	const char *verbose = SDL_getenv("SDL_FBCON_VERBOSE");
++	va_list ap;
++
++	if ( (verbose == NULL) || (*verbose == '\0') || (*verbose == '0') ) {
++		return;
++	}
++	fputs("SDL fbcon: ", stderr);
++	va_start(ap, fmt);
++	vfprintf(stderr, fmt, ap);
++	va_end(ap);
++	fputc('\n', stderr);
++}
++
+ int FB_InGraphicsMode(_THIS)
+ {
+ 	return((keyboard_fd >= 0) && (saved_kbd_mode >= 0));
+ }
+ 
++/* While the console is in graphics mode it shows no text, and the keyboard
++   sends raw codes that no shell can read.  FB_LeaveGraphicsMode() puts that
++   right, but only a program that ends through SDL_Quit() gets there.  One
++   that is ended by a signal, or that calls exit() without SDL_Quit(), would
++   leave a terminal that takes a reboot to get back when there is no other
++   way in.  So for as long as the console is in graphics mode, the signals
++   that end a program by default are caught: the console is put back, and
++   then the signal is left to do what it does.  exit() is covered by an
++   atexit() function.
++
++   This takes the place of SDL's parachute for those signals, which calls
++   SDL_Quit() from the signal handler; that can wait for ever on a lock the
++   interrupted code holds.  It also means that SIGINT and SIGTERM end the
++   program at once here, where SDL would only post an SDL_QUIT event that
++   a program which has stopped reading events never sees.
++
++   Nothing below makes anything but system calls, so it is safe to run
++   from a signal handler. */
++static const int fb_fatal_signals[] = {
++	SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT, SIGTERM, SIGHUP,
++	SIGINT, SIGQUIT, SIGPIPE, SIGALRM, SIGUSR1, SIGUSR2
++};
++#define FB_NUM_FATAL_SIGNALS	SDL_arraysize(fb_fatal_signals)
++
++static SDL_VideoDevice *fb_console_dev = NULL;	/* whose console is in graphics mode */
++static struct sigaction fb_old_actions[FB_NUM_FATAL_SIGNALS];
++static int fb_signals_caught = 0;
++static int fb_atexit_registered = 0;
++/* A stack for the handler, so that it can still run when the signal came
++   from the stack running out. */
++static char fb_signal_stack[16384];
++
++/* Open a virtual terminal by its number, without a library call that a
++   signal handler may not make. */
++static int FB_ReopenVT(int vt)
++{
++	char path[16] = "/dev/tty";
++	int n = 8;
++
++	if ( (vt < 1) || (vt > 63) ) {
++		vt = 0;		/* the one on the screen */
++	}
++	if ( vt >= 10 ) {
++		path[n++] = (char)('0' + vt / 10);
++	}
++	path[n++] = (char)('0' + vt % 10);
++	path[n] = '\0';
++	return open(path, O_RDWR | O_NOCTTY, 0);
++}
++
++static void FB_RestoreConsole(_THIS)
++{
++	if ( FB_InGraphicsMode(this) ) {
++		int fd = keyboard_fd;
++		int fresh = -1;
++
++		/* After a hangup (the shell that owned the terminal has gone,
++		   say) nothing can be done through a descriptor that was open
++		   at the time: every call fails with EIO.  The terminal is
++		   still in graphics mode.  Open it again and go on with that. */
++		if ( (ioctl(fd, KDSETMODE, KD_TEXT) < 0) && (errno == EIO) ) {
++			fresh = FB_ReopenVT(current_vt);
++			if ( fresh >= 0 ) {
++				fd = fresh;
++				ioctl(fd, KDSETMODE, KD_TEXT);
++			}
++		}
++		ioctl(fd, KDSKBMODE, saved_kbd_mode);
++		/* TCSAFLUSH also throws away the raw key codes that were
++		   never read, which the shell would take for typing. */
++		tcsetattr(fd, TCSAFLUSH, &saved_kbd_termios);
++		saved_kbd_mode = -1;
++
++		/* Head back over to the original virtual terminal */
++		ioctl(fd, VT_UNLOCKSWITCH, 1);
++		if ( saved_vt > 0 ) {
++			ioctl(fd, VT_ACTIVATE, saved_vt);
++		}
++		if ( fresh >= 0 ) {
++			close(fresh);
++		}
++	}
++}
++
++static void FB_FatalSignal(int sig)
++{
++	struct sigaction action;
++
++	if ( fb_console_dev != NULL ) {
++		FB_RestoreConsole(fb_console_dev);
++	}
++
++	/* Now let the signal end the program in the usual way.  It is
++	   blocked while we are in here, and arrives when we return. */
++	memset(&action, 0, sizeof(action));
++	action.sa_handler = SIG_DFL;
++	sigaction(sig, &action, NULL);
++	raise(sig);
++}
++
++static void FB_AtExit(void)
++{
++	if ( fb_console_dev != NULL ) {
++		FB_RestoreConsole(fb_console_dev);
++	}
++}
++
++static void FB_CatchSignals(_THIS)
++{
++	struct sigaction action;
++	stack_t stack;
++	int i;
++
++	fb_console_dev = this;
++
++	if ( !fb_atexit_registered ) {
++		fb_atexit_registered = (atexit(FB_AtExit) == 0);
++	}
++	if ( fb_signals_caught ) {
++		return;
++	}
++
++	memset(&stack, 0, sizeof(stack));
++	stack.ss_sp = fb_signal_stack;
++	stack.ss_size = sizeof(fb_signal_stack);
++	sigaltstack(&stack, NULL);
++
++	for ( i=0; i<FB_NUM_FATAL_SIGNALS; ++i ) {
++		if ( sigaction(fb_fatal_signals[i], NULL, &fb_old_actions[i]) < 0 ) {
++			fb_old_actions[i].sa_handler = SIG_IGN;
++			continue;
++		}
++		/* An ignored signal does not end the program: leave it be */
++		if ( fb_old_actions[i].sa_handler == SIG_IGN ) {
++			continue;
++		}
++		memset(&action, 0, sizeof(action));
++		action.sa_handler = FB_FatalSignal;
++		action.sa_flags = SA_ONSTACK;
++		/* No other signal while this one is seen to: a second one
++		   part of the way through would leave the job half done. */
++		sigfillset(&action.sa_mask);
++		sigaction(fb_fatal_signals[i], &action, NULL);
++	}
++	fb_signals_caught = 1;
++}
++
++static void FB_ReleaseSignals(void)
++{
++	struct sigaction action;
++	int i;
++
++	fb_console_dev = NULL;
++
++	if ( !fb_signals_caught ) {
++		return;
++	}
++	for ( i=0; i<FB_NUM_FATAL_SIGNALS; ++i ) {
++		/* Put back what was there, unless the program has put a
++		   handler of its own in since. */
++		if ( (fb_old_actions[i].sa_handler != SIG_IGN) &&
++		     (sigaction(fb_fatal_signals[i], NULL, &action) == 0) &&
++		     (action.sa_handler == FB_FatalSignal) ) {
++			sigaction(fb_fatal_signals[i], &fb_old_actions[i], NULL);
++		}
++	}
++	fb_signals_caught = 0;
++}
++
+ int FB_EnterGraphicsMode(_THIS)
+ {
+ 	struct termios keyboard_termios;
+ 
+ 	/* Set medium-raw keyboard mode */
+ 	if ( (keyboard_fd >= 0) && !FB_InGraphicsMode(this) ) {
++		int moved_vt = 0;
+ 
+ 		/* Switch to the correct virtual terminal */
++		saved_vt = 0;
+ 		if ( current_vt > 0 ) {
+ 			struct vt_stat vtstate;
+ 
+ 			if ( ioctl(keyboard_fd, VT_GETSTATE, &vtstate) == 0 ) {
+ 				saved_vt = vtstate.v_active;
+ 			}
+-			if ( ioctl(keyboard_fd, VT_ACTIVATE, current_vt) == 0 ) {
+-				ioctl(keyboard_fd, VT_WAITACTIVE, current_vt);
++			if ( saved_vt != current_vt ) {
++				if ( ioctl(keyboard_fd, VT_ACTIVATE, current_vt) == 0 ) {
++					ioctl(keyboard_fd, VT_WAITACTIVE, current_vt);
++					moved_vt = 1;
++				}
+ 			}
+ 		}
+ 
+ 		/* Set the terminal input mode */
+ 		if ( tcgetattr(keyboard_fd, &saved_kbd_termios) < 0 ) {
+ 			SDL_SetError("Unable to get terminal attributes");
++			/* Do not leave the screen on a terminal with nothing on it */
++			if ( moved_vt && (saved_vt > 0) ) {
++				ioctl(keyboard_fd, VT_ACTIVATE, saved_vt);
++			}
+ 			if ( keyboard_fd > 0 ) {
+ 				close(keyboard_fd);
+ 			}
+@@ -182,12 +393,20 @@ int FB_EnterGraphicsMode(_THIS)
+ 		}
+ 		if ( ioctl(keyboard_fd, KDGKBMODE, &saved_kbd_mode) < 0 ) {
+ 			SDL_SetError("Unable to get current keyboard mode");
++			saved_kbd_mode = -1;
++			if ( moved_vt && (saved_vt > 0) ) {
++				ioctl(keyboard_fd, VT_ACTIVATE, saved_vt);
++			}
+ 			if ( keyboard_fd > 0 ) {
+ 				close(keyboard_fd);
+ 			}
+ 			keyboard_fd = -1;
+ 			return(-1);
+ 		}
++
++		/* From here on there is something to put back */
++		FB_CatchSignals(this);
++
+ 		keyboard_termios = saved_kbd_termios;
+ 		keyboard_termios.c_lflag &= ~(ICANON | ECHO | ISIG);
+ 		keyboard_termios.c_iflag &= ~(ISTRIP | IGNCR | ICRNL | INLCR | IXOFF | IXON);
+@@ -217,17 +436,9 @@ int FB_EnterGraphicsMode(_THIS)
+ 
+ void FB_LeaveGraphicsMode(_THIS)
+ {
+-	if ( FB_InGraphicsMode(this) ) {
+-		ioctl(keyboard_fd, KDSETMODE, KD_TEXT);
+-		ioctl(keyboard_fd, KDSKBMODE, saved_kbd_mode);
+-		tcsetattr(keyboard_fd, TCSAFLUSH, &saved_kbd_termios);
+-		saved_kbd_mode = -1;
+-
+-		/* Head back over to the original virtual terminal */
+-		ioctl(keyboard_fd, VT_UNLOCKSWITCH, 1);
+-		if ( saved_vt > 0 ) {
+-			ioctl(keyboard_fd, VT_ACTIVATE, saved_vt);
+-		}
++	FB_RestoreConsole(this);
++	if ( fb_console_dev == this ) {
++		FB_ReleaseSignals();
+ 	}
+ }
+ 
+@@ -242,6 +453,29 @@ void FB_CloseKeyboard(_THIS)
+ 	keyboard_fd = -1;
+ }
+ 
++/* If the program was started on a virtual terminal, open that terminal and
++   say which one it is.  Returns the descriptor, or -1. */
++static int FB_OpenOwnVT(int *vt)
++{
++	unsigned int dev = 0;
++	int fd, mode;
++
++	fd = open("/dev/tty", O_RDWR, 0);
++	if ( fd < 0 ) {
++		return(-1);
++	}
++	/* A console answers KDGKBMODE; TIOCGDEV gives its real device
++	   number, which is major 4 and the terminal's number. */
++	if ( (ioctl(fd, KDGKBMODE, &mode) == 0) &&
++	     (ioctl(fd, TIOCGDEV, &dev) == 0) &&
++	     ((dev >> 8) == 4) && ((dev & 0xff) >= 1) && ((dev & 0xff) <= 63) ) {
++		*vt = (int)(dev & 0xff);
++		return(fd);
++	}
++	close(fd);
++	return(-1);
++}
++
+ int FB_OpenKeyboard(_THIS)
+ {
+ 	/* Open only if not already opened */
+@@ -249,18 +483,31 @@ int FB_OpenKeyboard(_THIS)
+ 		static const char * const tty0[] = { "/dev/tty0", "/dev/vc/0", NULL };
+ 		static const char * const vcs[] = { "/dev/vc/%d", "/dev/tty%d", NULL };
+ 		int i, tty0_fd;
++		int own_vt = 0;
++
++		/* A program started on a virtual terminal stays on it, as one
++		   that is not root always has.  Moving to a new terminal means
++		   that it has to move back at the end, and a program that
++		   ends without doing so leaves the screen on a terminal with
++		   nothing running on it.  SDL_FBCON_NEWVT asks for the move. */
++		if ( SDL_getenv("SDL_FBCON_NEWVT") == NULL ) {
++			keyboard_fd = FB_OpenOwnVT(&current_vt);
++			own_vt = (keyboard_fd >= 0);
++		}
+ 
+ 		/* Try to query for a free virtual terminal */
+ 		tty0_fd = -1;
+-		for ( i=0; tty0[i] && (tty0_fd < 0); ++i ) {
++		for ( i=0; !own_vt && tty0[i] && (tty0_fd < 0); ++i ) {
+ 			tty0_fd = open(tty0[i], O_WRONLY, 0);
+ 		}
+-		if ( tty0_fd < 0 ) {
++		if ( !own_vt && (tty0_fd < 0) ) {
+ 			tty0_fd = dup(0); /* Maybe stdin is a VT? */
+ 		}
+-		ioctl(tty0_fd, VT_OPENQRY, &current_vt);
+-		close(tty0_fd);
+-		if ( (geteuid() == 0) && (current_vt > 0) ) {
++		if ( !own_vt ) {
++			ioctl(tty0_fd, VT_OPENQRY, &current_vt);
++			close(tty0_fd);
++		}
++		if ( !own_vt && (geteuid() == 0) && (current_vt > 0) ) {
+ 			for ( i=0; vcs[i] && (keyboard_fd < 0); ++i ) {
+ 				char vtpath[12];
+ 
+@@ -311,6 +558,11 @@ int FB_OpenKeyboard(_THIS)
+ 
+ 		/* Set up keymap */
+ 		FB_vgainitkeymaps(keyboard_fd);
++
++		if ( keyboard_fd >= 0 ) {
++			FB_Verbose("keyboard on virtual terminal %d (%s)", current_vt,
++			           own_vt ? "the one this was started on" : "not the one this was started on");
++		}
+  	}
+  	return(keyboard_fd);
+ }
+@@ -324,11 +576,18 @@ static enum {
+ 	MOUSE_BM,
+ 	MOUSE_ELO,
+ 	MOUSE_TSLIB,
++	MOUSE_EVDEV,
+ 	NUM_MOUSE_DRVS
+ } mouse_drv = MOUSE_NONE;
+ 
+ void FB_CloseMouse(_THIS)
+ {
++	if ( mouse_drv == MOUSE_EVDEV ) {
++		/* mouse_fd is the first of the descriptors it closes */
++		FB_EvdevCloseMice();
++		mouse_drv = MOUSE_NONE;
++		mouse_fd = -1;
++	}
+ #if SDL_INPUT_TSLIB
+ 	if (ts_dev != NULL) {
+ 		ts_close(ts_dev);
+@@ -593,6 +852,24 @@ fprintf(stderr, "Using ELO touchscreen\n");
+ 		return(mouse_fd);
+ 	}
+ 
++	/* EVENT DEVICES */
++
++	/* A kernel without the mousedev driver has none of the devices
++	   below, only /dev/input/eventN.  Look there first, unless one of
++	   the other kinds was asked for. */
++	if ( (mousedev == NULL) &&
++	     ((mousedrv == NULL) || (SDL_strcmp(mousedrv, "EVDEV") == 0)) ) {
++		mouse_fd = FB_EvdevOpenMice();
++		if ( mouse_fd >= 0 ) {
++			mouse_drv = MOUSE_EVDEV;
++			return(mouse_fd);
++		}
++		if ( mousedrv != NULL ) {
++			mouse_drv = MOUSE_NONE;
++			return(mouse_fd);
++		}
++	}
++
+ 	/* STD MICE */
+ 
+ 	if ( mousedev == NULL ) {
+@@ -993,15 +1270,37 @@ static void switch_vt(_THIS, unsigned short which)
+ 
+ static void handle_keyboard(_THIS)
+ {
++	/* Bytes still to come of a keycode above 127.  In medium raw mode
++	   the kernel sends such a key (a multimedia key, say) as a zero
++	   keycode and two more bytes with the top bit set.  Those are not
++	   keys: read as such, they are two other keys being let go. */
++	static int skip = 0;
++	/* Ctrl-Alt-Fn switches to another virtual terminal only if
++	   SDL_FBCON_VTSWITCH is set.  Those three keys together are an
++	   ordinary thing to press in a game, and the terminal they lead to
++	   usually has nothing running on it. */
++	static int vt_switching = -1;
+ 	unsigned char keybuf[BUFSIZ];
+ 	int i, nread;
+ 	int pressed;
+ 	int scancode;
+ 	SDL_keysym keysym;
+ 
++	if ( vt_switching < 0 ) {
++		vt_switching = (SDL_getenv("SDL_FBCON_VTSWITCH") != NULL);
++	}
++
+ 	nread = read(keyboard_fd, keybuf, BUFSIZ);
+ 	for ( i=0; i<nread; ++i ) {
++		if ( skip > 0 ) {
++			--skip;
++			continue;
++		}
+ 		scancode = keybuf[i] & 0x7F;
++		if ( scancode == 0 ) {
++			skip = 2;
++			continue;
++		}
+ 		if ( keybuf[i] & 0x80 ) {
+ 			pressed = SDL_RELEASED;
+ 		} else {
+@@ -1009,7 +1308,7 @@ static void handle_keyboard(_THIS)
+ 		}
+ 		TranslateKey(scancode, &keysym);
+ 		/* Handle Ctrl-Alt-FN for vt switch */
+-		switch (keysym.sym) {
++		switch (vt_switching ? keysym.sym : SDLK_UNKNOWN) {
+ 		    case SDLK_F1:
+ 		    case SDLK_F2:
+ 		    case SDLK_F3:
+@@ -1066,7 +1365,8 @@ void FB_PumpEvents(_THIS)
+ 				max_fd = keyboard_fd;
+ 			}
+ 		}
+-		if ( mouse_fd >= 0 ) {
++		/* Event devices are read without blocking, each in turn */
++		if ( (mouse_fd >= 0) && (mouse_drv != MOUSE_EVDEV) ) {
+ 			FD_SET(mouse_fd, &fdset);
+ 			if ( max_fd < mouse_fd ) {
+ 				max_fd = mouse_fd;
+@@ -1078,12 +1378,15 @@ void FB_PumpEvents(_THIS)
+ 					handle_keyboard(this);
+ 				}
+ 			}
+-			if ( mouse_fd >= 0 ) {
++			if ( (mouse_fd >= 0) && (mouse_drv != MOUSE_EVDEV) ) {
+ 				if ( FD_ISSET(mouse_fd, &fdset) ) {
+ 					handle_mouse(this);
+ 				}
+ 			}
+ 		}
++		if ( mouse_drv == MOUSE_EVDEV ) {
++			FB_EvdevPumpMice();
++		}
+ 	} while ( posted );
+ }
+ 
+diff --git a/src/video/fbcon/SDL_fbevents_c.h b/src/video/fbcon/SDL_fbevents_c.h
+index fe8b09c..e157cf2 100644
+--- a/src/video/fbcon/SDL_fbevents_c.h
++++ b/src/video/fbcon/SDL_fbevents_c.h
+@@ -36,3 +36,11 @@ extern void FB_LeaveGraphicsMode(_THIS);
+ 
+ extern void FB_InitOSKeymap(_THIS);
+ extern void FB_PumpEvents(_THIS);
++
++extern void FB_Verbose(const char *fmt, ...);
++extern void FB_vgamousecallback(int button, int relative, int dx, int dy);
++
++/* Mice on the kernel's event devices: SDL_fbevdev.c */
++extern int FB_EvdevOpenMice(void);
++extern void FB_EvdevCloseMice(void);
++extern void FB_EvdevPumpMice(void);
+diff --git a/src/video/fbcon/SDL_fbvideo.c b/src/video/fbcon/SDL_fbvideo.c
+index 5e58809..0855de2 100644
+--- a/src/video/fbcon/SDL_fbvideo.c
++++ b/src/video/fbcon/SDL_fbvideo.c
+@@ -493,6 +493,31 @@ static void FB_SortModes(_THIS)
+ 	}
+ }
+ 
++/* Some frame buffers have one mode and cannot change it: simplefb and efifb,
++   which only show what the firmware set up, are two.  The kernel takes any
++   FBIOPUT_VSCREENINFO for them without complaint and answers with the mode
++   they have.  Ask for a size that is not the current one: if the current
++   one comes back, it is the only mode there is.
++
++   Without this, the search below finds the same thing after some sixty
++   requests.  That is not just slow.  While the console is in text mode,
++   the kernel redraws all of it after every request that succeeds. */
++static int FB_FixedMode(_THIS, const struct fb_var_screeninfo *current)
++{
++	struct fb_var_screeninfo vinfo = *current;
++
++	vinfo.xres = (current->xres == 640) ? 800 : 640;
++	vinfo.yres = (current->yres == 480) ? 600 : 480;
++	vinfo.xres_virtual = vinfo.xres;
++	vinfo.yres_virtual = vinfo.yres;
++	vinfo.activate = FB_ACTIVATE_TEST;
++	if ( ioctl(console_fd, FBIOPUT_VSCREENINFO, &vinfo) < 0 ) {
++		return(0);
++	}
++	return((vinfo.xres == current->xres) && (vinfo.yres == current->yres) &&
++	       (vinfo.bits_per_pixel == current->bits_per_pixel));
++}
++
+ static int FB_VideoInit(_THIS, SDL_PixelFormat *vformat)
+ {
+ 	const int pagesize = SDL_getpagesize();
+@@ -689,6 +714,11 @@ static int FB_VideoInit(_THIS, SDL_PixelFormat *vformat)
+ 	}
+ 	if ( SDL_getenv("SDL_FB_BROKEN_MODES") != NULL ) {
+ 		FB_AddMode(this, current_index, current_w, current_h, 0);
++	} else if ( FB_FixedMode(this, &vinfo) ) {
++		FB_AddMode(this, current_index, current_w, current_h, 0);
++		if ( modesdb ) {
++			fclose(modesdb);
++		}
+ 	} else if(modesdb) {
+ 		while ( read_fbmodes_mode(modesdb, &vinfo) ) {
+ 			for ( i=0; i<NUM_MODELISTS; ++i ) {
+@@ -797,17 +827,20 @@ static int FB_VideoInit(_THIS, SDL_PixelFormat *vformat)
+ 		FB_VideoQuit(this);
+ 		return(-1);
+ 	}
+-	if ( FB_OpenMouse(this) < 0 ) {
+-		const char *sdl_nomouse;
+-
+-		sdl_nomouse = SDL_getenv("SDL_NOMOUSE");
+-		if ( ! sdl_nomouse ) {
+-			SDL_SetError("Unable to open mouse");
+-			FB_VideoQuit(this);
+-			return(-1);
+-		}
++	/* A mouse is not needed to show a picture or to read the keyboard:
++	   carry on without one.  (This used to be an error unless
++	   SDL_NOMOUSE was set, which now only stops the search.) */
++	if ( SDL_getenv("SDL_NOMOUSE") != NULL ) {
++		FB_Verbose("no mouse looked for, SDL_NOMOUSE is set");
++	} else if ( FB_OpenMouse(this) < 0 ) {
++		FB_Verbose("no mouse found");
+ 	}
+ 
++	FB_Verbose("%dx%d, %d bits per pixel%s", current_w, current_h,
++	           (int)vformat->BitsPerPixel,
++	           (SDL_nummodes[((vformat->BitsPerPixel+7)/8)-1] == 1) ?
++	           ", the only mode" : "");
++
+ 	/* We're done! */
+ 	return(0);
+ }
+@@ -995,8 +1028,25 @@ static SDL_Surface *FB_SetVGA16Mode(_THIS, SDL_Surface *current,
+ }
+ #endif /* VGA16_FBCON_SUPPORT */
+ 
++static SDL_Surface *FB_DoSetVideoMode(_THIS, SDL_Surface *current,
++				int width, int height, int bpp, Uint32 flags);
++
++/* If the mode cannot be set, the console must not be left in graphics
++   mode: the program is about to print why it is giving up. */
+ static SDL_Surface *FB_SetVideoMode(_THIS, SDL_Surface *current,
+ 				int width, int height, int bpp, Uint32 flags)
++{
++	SDL_Surface *mode;
++
++	mode = FB_DoSetVideoMode(this, current, width, height, bpp, flags);
++	if ( mode == NULL ) {
++		FB_LeaveGraphicsMode(this);
++	}
++	return(mode);
++}
++
++static SDL_Surface *FB_DoSetVideoMode(_THIS, SDL_Surface *current,
++				int width, int height, int bpp, Uint32 flags)
+ {
+ 	struct fb_fix_screeninfo finfo;
+ 	struct fb_var_screeninfo vinfo;
+@@ -1275,8 +1325,12 @@ if ( surface->pitch > SDL_VideoSurface->pitch ) {
+ 	SDL_SetError("Surface requested wider than screen");
+ 	return(-1);
+ }
+-surface->pitch = SDL_VideoSurface->pitch;
+-	size = surface->h * surface->pitch;
++	/* The surface only takes the pitch of the screen once it has its
++	   video memory, at the end of this.  When there is none, the caller
++	   gets ordinary memory instead, of the surface's height times its
++	   pitch: with the screen's pitch left in it, a picture 24 pixels wide
++	   took as much memory as one the width of the screen. */
++	size = surface->h * SDL_VideoSurface->pitch;
+ #ifdef FBCON_DEBUG
+ 	fprintf(stderr, "Allocating bucket of %d bytes\n", size);
+ #endif
+@@ -1331,6 +1385,7 @@ surface->pitch = SDL_VideoSurface->pitch;
+ #endif
+ 	surfaces_memleft -= size;
+ 	surface->flags |= SDL_HWSURFACE;
++	surface->pitch = SDL_VideoSurface->pitch;
+ 	surface->pixels = bucket->base;
+ 	surface->hwdata = (struct private_hwdata *)bucket;
+ 	return(0);
+@@ -1925,7 +1980,16 @@ static void FB_VideoQuit(_THIS)
+ 			int left = this->screen->pitch*this->screen->h;
+ 			while ( left-- ) { *rowp++ = 0; }
+ #else
+-			SDL_memset(this->screen->pixels,0,this->screen->h*this->screen->pitch);
++			/* All of the screen, and not only as many lines as the
++			   program asked for: a smaller picture is centred, and
++			   its last lines were left behind.  (Only when pixels
++			   is the start of the frame buffer; it is not while
++			   the surface is locked or a second page is shown.) */
++			int lines = this->screen->h;
++			if ( (char *)this->screen->pixels == (mapped_mem+mapped_offset) ) {
++				lines += 2*this->offset_y;
++			}
++			SDL_memset(this->screen->pixels,0,lines*this->screen->pitch);
+ #endif
+ 		}
+ 		/* This test fails when using the VGA16 shadow memory */
+@@ -1979,4 +2043,10 @@ static void FB_VideoQuit(_THIS)
+ 	}
+ 	FB_CloseMouse(this);
+ 	FB_CloseKeyboard(this);
++
++	/* SDL took its SIGINT and SIGTERM handlers out before it called us,
++	   or meant to: ours were in the way then, and when ours went just
++	   now they put SDL's back.  Those only post an event, which nobody
++	   reads any more, so the program could not be interrupted. */
++	SDL_QuitQuit();
+ }
