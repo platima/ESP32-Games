@@ -1,0 +1,23 @@
+# What bios-tests.sh expects of each result.  BIOS-COVERAGE.txt says more.
+#
+# NAME (a shell pattern), then pass or xfail, then for xfail what differs.
+# The last line that matches a name decides.  Every result has to match a
+# line, and every line has to match a result.  A result that passes but is
+# listed as xfail fails the run: this list is then out of date.
+#
+# "BIOS" means SeaBIOS or SeaVGABIOS as built here (tools/build-bios.sh,
+# with patches/seabios-korvo.patch); "tiny386" means the emulated hardware
+# or its drawing (vga.c, pc.c); "emulink" means tiny386's floppy port and
+# its driver in tiny386's SeaBIOS patch.
+
+*                                       pass
+
+# ---- the display: 12h
+10.12.36.refresh-off.black              xfail  tiny386: 12h BL=36h now sets the screen-off bit (SR01h bit 5), but vga.c draws the picture all the same
+
+# ---- VBE
+10.4f.0a.ax                             xfail  BIOS: no protected mode interface (4F0Ah answers 0100h)
+
+# ---- int 13h, the floppies
+13.fd*.02.past-the-track-refused        xfail  emulink: a sector past the end of the track reads the next track's
+13.fd*.05.f6-in-the-sector              xfail  emulink: formatting a track writes nothing

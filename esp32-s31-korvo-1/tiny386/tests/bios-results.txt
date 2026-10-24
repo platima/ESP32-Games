@@ -1,0 +1,898 @@
+PASS     10.11.30.cx                              0010
+PASS     10.11.30.dl                              18
+PASS     10.11.30.bh6-pointer                     ax=f5e0
+PASS     10.11.30.bh2-pointer                     ax=c5e0
+PASS     10.11.30.bh3-pointer                     ax=d3e0
+PASS     10.00.m00.getmode                        00
+PASS     10.00.m00.getcols                        28
+PASS     10.00.m00.getpage                        00
+PASS     10.00.m00.bda-mode                       00
+PASS     10.00.m00.bda-cols                       0028
+PASS     10.00.m00.bda-rows                       18
+PASS     10.00.m00.bda-cheight                    0010
+PASS     10.00.m01.getmode                        01
+PASS     10.00.m01.getcols                        28
+PASS     10.00.m01.getpage                        00
+PASS     10.00.m01.bda-mode                       01
+PASS     10.00.m01.bda-cols                       0028
+PASS     10.00.m01.bda-rows                       18
+PASS     10.00.m01.bda-cheight                    0010
+PASS     10.00.m02.getmode                        02
+PASS     10.00.m02.getcols                        50
+PASS     10.00.m02.getpage                        00
+PASS     10.00.m02.bda-mode                       02
+PASS     10.00.m02.bda-cols                       0050
+PASS     10.00.m02.bda-rows                       18
+PASS     10.00.m02.bda-cheight                    0010
+PASS     10.00.m03.getmode                        03
+PASS     10.00.m03.getcols                        50
+PASS     10.00.m03.getpage                        00
+PASS     10.00.m03.bda-mode                       03
+PASS     10.00.m03.bda-cols                       0050
+PASS     10.00.m03.bda-rows                       18
+PASS     10.00.m03.bda-cheight                    0010
+PASS     10.00.m83.getmode                        83
+PASS     10.00.m83.kept-first                     1f221f21
+PASS     10.00.m83.kept-last                      07204c5c
+PASS     10.00.m08.refused                        83
+PASS     10.00.m09.refused                        83
+PASS     10.00.m0a.refused                        83
+PASS     10.00.m0b.refused                        83
+PASS     10.00.m0c.refused                        83
+PASS     10.00.m04.getmode                        04
+PASS     10.00.m04.getcols                        28
+PASS     10.00.m04.getpage                        00
+PASS     10.00.m04.bda-mode                       04
+PASS     10.00.m04.bda-cols                       0028
+PASS     10.00.m04.bda-rows                       18
+PASS     10.00.m04.bda-cheight                    0008
+PASS     10.00.m05.getmode                        05
+PASS     10.00.m05.getcols                        28
+PASS     10.00.m05.getpage                        00
+PASS     10.00.m05.bda-mode                       05
+PASS     10.00.m05.bda-cols                       0028
+PASS     10.00.m05.bda-rows                       18
+PASS     10.00.m05.bda-cheight                    0008
+PASS     10.00.m06.getmode                        06
+PASS     10.00.m06.getcols                        50
+PASS     10.00.m06.getpage                        00
+PASS     10.00.m06.bda-mode                       06
+PASS     10.00.m06.bda-cols                       0050
+PASS     10.00.m06.bda-rows                       18
+PASS     10.00.m06.bda-cheight                    0008
+PASS     10.00.m0d.getmode                        0d
+PASS     10.00.m0d.getcols                        28
+PASS     10.00.m0d.getpage                        00
+PASS     10.00.m0d.bda-mode                       0d
+PASS     10.00.m0d.bda-cols                       0028
+PASS     10.00.m0d.bda-rows                       18
+PASS     10.00.m0d.bda-cheight                    0008
+PASS     10.00.m0e.getmode                        0e
+PASS     10.00.m0e.getcols                        50
+PASS     10.00.m0e.getpage                        00
+PASS     10.00.m0e.bda-mode                       0e
+PASS     10.00.m0e.bda-cols                       0050
+PASS     10.00.m0e.bda-rows                       18
+PASS     10.00.m0e.bda-cheight                    0008
+PASS     10.00.m0f.getmode                        0f
+PASS     10.00.m0f.getcols                        50
+PASS     10.00.m0f.getpage                        00
+PASS     10.00.m0f.bda-mode                       0f
+PASS     10.00.m0f.bda-cols                       0050
+PASS     10.00.m0f.bda-rows                       18
+PASS     10.00.m0f.bda-cheight                    000e
+PASS     10.00.m10.getmode                        10
+PASS     10.00.m10.getcols                        50
+PASS     10.00.m10.getpage                        00
+PASS     10.00.m10.bda-mode                       10
+PASS     10.00.m10.bda-cols                       0050
+PASS     10.00.m10.bda-rows                       18
+PASS     10.00.m10.bda-cheight                    000e
+PASS     10.00.m11.getmode                        11
+PASS     10.00.m11.getcols                        50
+PASS     10.00.m11.getpage                        00
+PASS     10.00.m11.bda-mode                       11
+PASS     10.00.m11.bda-cols                       0050
+PASS     10.00.m11.bda-rows                       1d
+PASS     10.00.m11.bda-cheight                    0010
+PASS     10.00.m12.getmode                        12
+PASS     10.00.m12.getcols                        50
+PASS     10.00.m12.getpage                        00
+PASS     10.00.m12.bda-mode                       12
+PASS     10.00.m12.bda-cols                       0050
+PASS     10.00.m12.bda-rows                       1d
+PASS     10.00.m12.bda-cheight                    0010
+PASS     10.00.m13.getmode                        13
+PASS     10.00.m13.getcols                        28
+PASS     10.00.m13.getpage                        00
+PASS     10.00.m13.bda-mode                       13
+PASS     10.00.m13.bda-cols                       0028
+PASS     10.00.m13.bda-rows                       18
+PASS     10.00.m13.bda-cheight                    0008
+PASS     10.00.m07.getmode                        07
+PASS     10.00.m07.getcols                        50
+PASS     10.00.m07.getpage                        00
+PASS     10.00.m07.bda-mode                       07
+PASS     10.00.m07.bda-cols                       0050
+PASS     10.00.m07.bda-rows                       18
+PASS     10.00.m07.bda-cheight                    0010
+PASS     10.00.m03-after-m07.palette-registers    
+PASS     10.00.m03-after-m03.palette-registers    
+PASS     10.00.m00.geometry                       720x400 at (40,40), within 720x400 at (40,40)
+PASS     10.00.m00.text                           all 1000 cells
+PASS     10.00.m00.colours                        all 1000 cells
+PASS     10.00.m01.geometry                       720x400 at (40,40), within 720x400 at (40,40)
+PASS     10.00.m01.text                           all 1000 cells
+PASS     10.00.m01.colours                        all 1000 cells
+PASS     10.00.m02.geometry                       720x400 at (40,40), within 720x400 at (40,40)
+PASS     10.00.m02.text                           all 2000 cells
+PASS     10.00.m02.colours                        all 2000 cells
+PASS     10.00.m03.geometry                       720x400 at (40,40), within 720x400 at (40,40)
+PASS     10.00.m03.text                           all 2000 cells
+PASS     10.00.m03.colours                        all 2000 cells
+PASS     10.00.m04.geometry                       640x400 at (80,40)
+PASS     10.00.m04.pattern                        256000 pixels, 4 colours
+PASS     10.00.m04.colours                        all 4 as wanted
+PASS     10.00.m05.geometry                       640x400 at (80,40)
+PASS     10.00.m05.pattern                        256000 pixels, 4 colours
+PASS     10.00.m06.geometry                       640x400 at (80,40)
+PASS     10.00.m06.pattern                        256000 pixels, 2 colours
+PASS     10.00.m06.colours                        all 2 as wanted
+PASS     10.00.m0d.geometry                       640x400 at (80,40)
+PASS     10.00.m0d.pattern                        256000 pixels, 16 colours
+PASS     10.00.m0d.colours                        all 16 as wanted
+PASS     10.00.m0e.geometry                       640x400 at (80,40)
+PASS     10.00.m0e.pattern                        256000 pixels, 16 colours
+PASS     10.00.m0e.colours                        all 16 as wanted
+PASS     10.00.m0f.geometry                       640x350 at (80,65)
+PASS     10.00.m0f.pattern                        224000 pixels, 4 colours
+PASS     10.00.m10.geometry                       640x350 at (80,65)
+PASS     10.00.m10.pattern                        224000 pixels, 16 colours
+PASS     10.00.m10.colours                        all 16 as wanted
+PASS     10.00.m11.geometry                       640x480 at (80,0)
+PASS     10.00.m11.pattern                        307200 pixels, 2 colours
+PASS     10.00.m11.colours                        all 2 as wanted
+PASS     10.00.m12.geometry                       640x480 at (80,0)
+PASS     10.00.m12.pattern                        307200 pixels, 16 colours
+PASS     10.00.m12.colours                        all 16 as wanted
+PASS     10.00.m13.geometry                       640x400 at (80,40)
+PASS     10.00.m13.pattern                        256000 pixels, 32 colours
+PASS     10.00.m13.colours                        all 32 as wanted
+PASS     10.00.m07.geometry                       720x400 at (40,40), within 720x400 at (40,40)
+PASS     10.00.m07.text                           all 2000 cells
+PASS     10.01.after-mode-bda                     0607
+PASS     10.01.after-mode-crtc                    0d0e
+PASS     10.01.000f-bda                           000f
+PASS     10.01.000f-crtc                          000f
+PASS     10.01.0607-crtc                          0d0e
+PASS     10.01.hidden-crtc                        20
+PASS     10.02.bda-page0                          050a
+PASS     10.02.crtc                               019a
+PASS     10.02.bda-page1                          0307
+PASS     10.02.crtc-not-for-page1                 019a
+PASS     10.03.page0                              050a
+PASS     10.03.shape                              0607
+PASS     10.03.page1                              0307
+PASS     10.05.bda-page                           01
+PASS     10.05.bda-start                          1000
+PASS     10.05.crtc-start                         0800
+PASS     10.05.crtc-cursor                        08f7
+PASS     10.0f.page                               01
+PASS     10.05.back-to-0                          0000
+PASS     10.06.window                             
+PASS     10.06.clear                              
+PASS     10.06.whole                              
+PASS     10.07.window                             
+PASS     10.07.clear                              
+PASS     10.08.page0                              1f73
+PASS     10.08.page1                              1e6c
+PASS     10.09.write                              
+PASS     10.09.cursor-stays                       0846
+PASS     10.0a.write                              
+PASS     10.0e.backspace                          030c
+PASS     10.0e.cr-lf-bel                          0400
+PASS     10.0e.control                            
+PASS     10.0e.scroll-cursor                      1802
+PASS     10.0e.scroll                             
+PASS     10.0e.bh-page1-left-alone                6c
+PASS     10.0e.bh-page1-cursor-stays              0307
+PASS     10.0e.bh-page0-cursor                    1803
+PASS     10.0e.bh-page0-written                   
+PASS     10.13.al0                                
+PASS     10.13.al0-cursor-stays                   1803
+PASS     10.13.al1                                
+PASS     10.13.al1-cursor                         0f01
+PASS     10.13.al2                                
+PASS     10.13.al2-cursor-stays                   0f01
+PASS     10.13.al3                                
+PASS     10.13.al3-cursor                         1102
+PASS     10.05.page1.geometry                     720x400 at (40,40), within 720x400 at (40,40)
+PASS     10.05.page1.text                         all 2000 cells
+PASS     10.05.page1.colours                      all 2000 cells
+PASS     10.text-final.geometry                   720x396 at (40,40), within 720x400 at (40,40)
+PASS     10.text-final.text                       all 2000 cells
+PASS     10.text-final.colours                    all 2000 cells
+PASS     10.01.cursor-block.geometry              720x396 at (40,40), within 720x400 at (40,40)
+PASS     10.01.cursor-block.text                  all 2000 cells
+PASS     10.01.cursor-block.colours               all 2000 cells
+PASS     10.01.cursor-block.shown                 lines 0 to 15
+PASS     10.01.cursor-block.blinks                shown in 5 of 10 looks
+PASS     10.01.cursor-default.geometry            720x400 at (40,40), within 720x400 at (40,40)
+PASS     10.01.cursor-default.text                all 2000 cells
+PASS     10.01.cursor-default.colours             all 2000 cells
+PASS     10.01.cursor-default.shown               lines 13 to 14
+PASS     10.01.cursor-default.blinks              shown in 5 of 10 looks
+PASS     10.10.07.after-mode                      
+PASS     10.10.08.after-mode                      00
+PASS     10.10.09.after-mode                      
+PASS     10.10.17.after-mode                      
+PASS     10.10.15.after-mode-rg                   3f00
+PASS     10.10.15.after-mode-gb                   3f3f
+PASS     10.10.00.read-back                       3c
+PASS     10.10.01.read-back                       05
+PASS     10.10.02.read-back                       
+PASS     10.10.10.read-back-rg                    3f00
+PASS     10.10.10.read-back-gb                    2000
+PASS     10.10.12.read-back                       
+PASS     10.10.1a.mode16                          01
+PASS     10.10.1a.page2                           02
+PASS     10.10.13.ar10-bit7                       80
+PASS     10.10.13.ar14                            02
+PASS     10.10.1a.back                            0000
+PASS     10.10.19.mask                            0f
+PASS     10.10.03.intensity-ar10                  00
+PASS     10.10.03.blink-ar10                      08
+PASS     10.10.1b.sum                             
+PASS     10.12.33.enable                          12
+PASS     10.12.33.summed                          
+PASS     10.12.33.disabled-r                      3f
+PASS     10.12.33.disabled-gb                     0000
+PASS     10.12.31.disable                         12
+PASS     10.12.31.kept-r                          01
+PASS     10.12.31.kept-gb                         0203
+PASS     10.12.31.loaded-r                        00
+PASS     10.12.31.loaded-gb                       002a
+PASS     10.0b.palette0-12                        0204
+PASS     10.0b.palette0-3                         06
+PASS     10.0b.palette1-12                        0305
+PASS     10.0b.palette1-3                         07
+PASS     10.0b.background                         01
+PASS     10.10.00.geometry                        640x480 at (80,0)
+PASS     10.10.00.pattern                         307200 pixels, 16 colours
+PASS     10.10.00.colours                         all 16 as wanted
+PASS     10.10.02.geometry                        640x480 at (80,0)
+PASS     10.10.02.pattern                         307200 pixels, 16 colours
+PASS     10.10.02.colours                         all 16 as wanted
+PASS     10.10.12.geometry                        640x480 at (80,0)
+PASS     10.10.12.pattern                         307200 pixels, 16 colours
+PASS     10.10.12.colours                         all 16 as wanted
+PASS     10.10.13.geometry                        640x480 at (80,0)
+PASS     10.10.13.pattern                         307200 pixels, 16 colours
+PASS     10.10.13.colours                         all 16 as wanted
+PASS     10.10.03.blink.background                light grey, as with blinking on
+PASS     10.10.03.blink.blinks                    the B shown in 5 of 10 looks
+PASS     10.10.03.intensity.geometry              720x400 at (40,40), within 720x400 at (40,40)
+PASS     10.10.03.intensity.text                  all 2000 cells
+PASS     10.10.03.intensity.colours               all 2000 cells
+PASS     10.11.01.glyph-A                         ax=038e
+PASS     10.11.01.glyph-g                         ax=05a2
+PASS     10.11.01.bda-rows                        18
+PASS     10.11.01.bda-cheight                     0010
+PASS     10.11.01.crtc-09                         0f
+PASS     10.11.02.glyph-A                         ax=0208
+PASS     10.11.02.glyph-g                         ax=0338
+PASS     10.11.04.glyph-A                         ax=0410
+PASS     10.11.04.glyph-g                         ax=0670
+PASS     10.11.04.bda-rows                        18
+PASS     10.11.04.bda-cheight                     0010
+PASS     10.11.04.crtc-09                         0f
+PASS     10.11.12.50-lines.bda-rows               31
+PASS     10.11.12.50-lines.bda-cheight            0008
+PASS     10.11.12.50-lines.crtc-09                07
+PASS     10.11.11.28-lines.bda-rows               1b
+PASS     10.11.11.28-lines.bda-cheight            000e
+PASS     10.11.11.28-lines.crtc-09                0d
+PASS     10.11.14.bda-rows                        18
+PASS     10.11.14.bda-cheight                     0010
+PASS     10.11.14.crtc-09                         0f
+PASS     10.12.30.350                             12
+PASS     10.12.30.350-lines.bda-rows              18
+PASS     10.12.30.350-lines.bda-cheight           000e
+PASS     10.12.30.350-lines.crtc-09               0d
+PASS     10.11.12.43-lines.bda-rows               2a
+PASS     10.11.12.43-lines.bda-cheight            0008
+PASS     10.11.12.43-lines.crtc-09                07
+PASS     10.12.30.350-lines.m07.bda-rows          18
+PASS     10.12.30.350-lines.m07.bda-cheight       000e
+PASS     10.12.30.350-lines.m01.bda-rows          18
+PASS     10.12.30.350-lines.m01.bda-cheight       000e
+PASS     10.12.30.350-lines.m01.crtc-09           0d
+PASS     10.12.30.400                             12
+PASS     10.12.30.400-lines.bda-rows              18
+PASS     10.12.30.400-lines.bda-cheight           0010
+PASS     10.12.30.400-lines.crtc-09               0f
+PASS     10.11.00.glyph                           ax=4100
+PASS     10.11.04.block1-glyph-B                  ax=0420
+PASS     10.11.03.sr3                             04
+PASS     10.11.23.bda-rows                        3b
+PASS     10.11.23.bda-cheight                     0008
+PASS     10.11.23.int43                           c00093e0
+PASS     10.08.m12-graphics                       43
+PASS     10.11.24.bda-rows                        1d
+PASS     10.11.24.bda-cheight                     0010
+PASS     10.11.24.int43                           c00075e0
+PASS     10.11.22.bda-rows                        21
+PASS     10.11.22.bda-cheight                     000e
+PASS     10.11.22.int43                           c00085e0
+PASS     10.08.m13-graphics                       6f
+PASS     10.08.m04-graphics                       47
+PASS     10.11.12.50-lines.geometry               720x400 at (40,40), within 720x400 at (40,40)
+PASS     10.11.12.50-lines.text                   all 4000 cells
+PASS     10.11.12.50-lines.colours                all 4000 cells
+PASS     10.11.11.28-lines.geometry               720x400 at (40,40), within 720x400 at (40,40)
+PASS     10.11.11.28-lines.text                   all 2240 cells
+PASS     10.11.11.28-lines.colours                all 2240 cells
+PASS     10.12.30.350-lines.geometry              640x350 at (80,65), within 640x350 at (80,65)
+PASS     10.12.30.350-lines.text                  all 2000 cells
+PASS     10.12.30.350-lines.colours               all 2000 cells
+PASS     10.11.12.43-lines.geometry               640x344 at (80,65), within 640x350 at (80,65)
+PASS     10.11.12.43-lines.text                   all 3440 cells
+PASS     10.11.12.43-lines.colours                all 3440 cells
+PASS     10.12.30.350-lines.m07.geometry          720x350 at (40,65), within 720x350 at (40,65)
+PASS     10.12.30.350-lines.m07.text              all 2000 cells
+PASS     10.12.30.350-lines.m01.geometry          640x350 at (80,65), within 640x350 at (80,65)
+PASS     10.12.30.350-lines.m01.text              all 1000 cells
+PASS     10.12.30.350-lines.m01.colours           all 1000 cells
+PASS     10.11.00.user.geometry                   718x400 at (40,40), within 720x400 at (40,40)
+PASS     10.11.00.user.text                       all 2000 cells
+PASS     10.11.00.user.colours                    all 2000 cells
+PASS     10.11.03.blocks.geometry                 718x400 at (40,40), within 720x400 at (40,40)
+PASS     10.11.03.blocks.text                     all 2000 cells
+PASS     10.11.03.blocks.colours                  all 2000 cells
+PASS     10.11.2x.m12.text                        5 strings and 0 pixels, every pixel right
+PASS     10.09.m13.text                           2 strings and 0 pixels, every pixel right
+PASS     10.09.m04.text                           3 strings and 0 pixels, every pixel right
+PASS     10.12.10.colour                          00
+PASS     10.12.10.memory-256k                     03
+PASS     10.12.34.disable                         12
+PASS     10.12.34.bda-bit                         01
+PASS     10.12.34.crtc-as-given                   0607
+PASS     10.12.34.enable                          00
+PASS     10.12.32.disable                         12
+PASS     10.12.32.misc-output-bit1-off            00
+PASS     10.12.32.write-ignored-while-off         1f41
+PASS     10.12.32.on-again                        1f43
+PASS     10.1a.00.al                              1a
+PASS     10.1a.00.active                          08
+PASS     10.1a.00.alternate                       00
+PASS     10.1a.01.al                              1a
+PASS     10.1b.al                                 1b
+PASS     10.1b.m03.mode                           03
+PASS     10.1b.m03.cols                           0050
+PASS     10.1b.m03.regen-length                   1000
+PASS     10.1b.m03.start                          0000
+PASS     10.1b.m03.cursor-page0                   050a
+PASS     10.1b.m03.cursor-type                    0607
+PASS     10.1b.m03.page                           00
+PASS     10.1b.m03.crtc-port                      03d4
+PASS     10.1b.m03.rows                           19
+PASS     10.1b.m03.char-height                    0010
+PASS     10.1b.m03.dcc-active                     08
+PASS     10.1b.m03.dcc-alternate                  00
+PASS     10.1b.m03.colours                        0010
+PASS     10.1b.m03.pages                          08
+PASS     10.1b.m03.scan-lines-400                 02
+PASS     10.1b.m03.memory-256k                    03
+PASS     10.1b.table.modes-00-13                  000fe0ff
+PASS     10.1b.table.scan-lines                   07
+PASS     10.1b.m12.mode                           12
+PASS     10.1b.m12.cols                           0050
+PASS     10.1b.m12.rows                           1e
+PASS     10.1b.m12.char-height                    0010
+PASS     10.1b.m12.colours                        0010
+PASS     10.1b.m12.pages                          01
+PASS     10.1b.m12.scan-lines-480                 03
+PASS     10.1b.m13.mode                           13
+PASS     10.1b.m13.cols                           0028
+PASS     10.1b.m13.rows                           19
+PASS     10.1b.m13.char-height                    0008
+PASS     10.1b.m13.colours                        0100
+PASS     10.1b.m13.pages                          01
+PASS     10.1b.m13.scan-lines-400                 02
+PASS     10.1c.00.al                              1c
+PASS     10.1c.01.al                              1c
+PASS     10.1c.02.al                              1c
+PASS     10.1c.02.bda-cursor                      050a
+PASS     10.1c.02.crtc-cursor                     019a
+PASS     10.1c.02.dac-r                           0a
+PASS     10.1c.02.dac-g                           14
+PASS     10.1c.02.dac-b                           1e
+PASS     10.1c.02.palette-register                01
+PASS     10.12.36.off                             12
+PASS     10.12.36.sr01-bit5                       20
+PASS     10.12.36.on                              00
+XFAIL    10.12.36.refresh-off.black               the picture is still shown: 640x480 at (80,0)  [tiny386: 12h BL=36h now sets the screen-off bit (SR01h bit 5), but vga.c draws the picture all the same]
+PASS     10.0c.m04.read-back                      
+PASS     10.0c.m04.xor                            
+PASS     10.0c.m05.read-back                      
+PASS     10.0c.m05.xor                            
+PASS     10.0c.m06.read-back                      
+PASS     10.0c.m06.xor                            
+PASS     10.0c.m0d.read-back                      
+PASS     10.0c.m0d.xor                            
+PASS     10.0c.m0e.read-back                      
+PASS     10.0c.m0e.xor                            
+PASS     10.0c.m0f.read-back                      
+PASS     10.0c.m0f.xor                            
+PASS     10.0c.m10.read-back                      
+PASS     10.0c.m10.xor                            
+PASS     10.0c.m11.read-back                      
+PASS     10.0c.m11.xor                            
+PASS     10.0c.m12.read-back                      
+PASS     10.0c.m12.xor                            
+PASS     10.0c.m13.read-back                      
+PASS     10.0c.m13.memory                         15
+PASS     10.0c.m0d.page1                          0e
+PASS     10.0c.m0d.page0-untouched                00
+PASS     10.06.m13.window                         
+PASS     10.07.m13.window                         
+PASS     10.06.m12.window                         
+PASS     10.07.m12.window                         
+PASS     10.0c.m12.text                           0 strings and 8 pixels, every pixel right
+PASS     10.0c.m13.text                           0 strings and 8 pixels, every pixel right
+PASS     10.4f.256k.00.ax                         004f
+PASS     10.4f.256k.00.signature                  41534556
+PASS     10.4f.256k.list.has-100-640x400x8        ax=ffff
+PASS     10.4f.00.ax                              004f
+PASS     10.4f.00.signature                       41534556
+PASS     10.4f.00.memory-1m                       0010
+PASS     10.4f.01.every-mode                      0000
+PASS     10.4f.list.has-101-640x480x8             ax=004f
+PASS     10.4f.list.has-111-640x480x16            ax=004f
+PASS     10.4f.list.has-100-640x400x8             ax=004f
+PASS     10.4f.list.has-103-800x600x8             ax=004f
+PASS     10.4f.01.m101                            004f
+PASS     10.4f.01.m101.width                      0280
+PASS     10.4f.01.m101.height                     01e0
+PASS     10.4f.01.m101.bpp                        08
+PASS     10.4f.01.m101.window-segment             a000
+PASS     10.4f.01.m101.granularity-64k            0040
+PASS     10.4f.01.m101.bytes-a-line               0280
+PASS     10.4f.02.m101                            004f
+PASS     10.4f.03.ax                              004f
+PASS     10.4f.03.mode                            0101
+PASS     10.4f.05.set                             004f
+PASS     10.4f.05.get                             004f
+PASS     10.4f.05.position                        0003
+PASS     10.4f.06.get                             004f
+PASS     10.4f.06.get-bytes                       0280
+PASS     10.4f.06.get-pixels                      0280
+PASS     10.4f.06.set                             004f
+PASS     10.4f.06.set-bytes                       0400
+PASS     10.4f.06.set-pixels                      0400
+PASS     10.4f.07.set                             004f
+PASS     10.4f.07.get                             004f
+PASS     10.4f.07.get-x                           0000
+PASS     10.4f.07.get-y                           0001
+PASS     10.4f.08.set                             004f
+PASS     10.4f.08.set-8                           08
+PASS     10.4f.08.get                             004f
+PASS     10.4f.08.get-8                           08
+PASS     10.4f.08.picture-kept                    02
+PASS     10.4f.09.set                             004f
+PASS     10.4f.09.get                             004f
+PASS     10.4f.09.read-back                       ax=004f
+PASS     10.4f.08.back-to-6                       06
+PASS     10.4f.04.size                            004f
+PASS     10.4f.04.save                            004f
+PASS     10.4f.04.restore                         004f
+PASS     10.4f.04.mode-back                       0101
+XFAIL    10.4f.0a.ax                              got=0100 want=004f  [BIOS: no protected mode interface (4F0Ah answers 0100h)]
+PASS     10.4f.02.refuses-105                     not in the list
+PASS     10.4f.02.m101-lfb                        004f
+PASS     10.4f.lfb.int15-87                       0000
+PASS     10.4f.02.m111-lfb                        004f
+PASS     10.4f.lfb16.int15-87                     0000
+PASS     10.4f.01.m103                            004f
+PASS     10.4f.01.m103.width                      0320
+PASS     10.4f.01.m103.height                     0258
+PASS     10.4f.01.m103.bytes-a-line               0320
+PASS     10.4f.02.m103                            004f
+PASS     10.4f.07.m103-set                        004f
+PASS     10.4f.02.m114-lfb                        004f
+PASS     10.4f.02.m102                            004f
+PASS     10.4f.02.m101.geometry                   640x480 at (80,0)
+PASS     10.4f.02.m101.pattern                    307200 pixels, 16 colours
+PASS     10.4f.02.m101.colours                    all 16 as wanted
+PASS     10.4f.07.start-line-1.geometry           640x479 at (80,0)
+PASS     10.4f.07.start-line-1.pattern            306560 pixels, 16 colours
+PASS     10.4f.07.start-line-1.colours            all 16 as wanted
+PASS     10.4f.09.dac8.geometry                   640x480 at (80,0)
+PASS     10.4f.09.dac8.pattern                    307200 pixels, 16 colours
+PASS     10.4f.09.dac8.colours                    all 16 as wanted
+PASS     10.4f.02.m101-lfb.geometry               640x480 at (80,0)
+PASS     10.4f.02.m101-lfb.pattern                307200 pixels, 16 colours
+PASS     10.4f.02.m101-lfb.colours                all 16 as wanted
+PASS     10.4f.02.m111-lfb.geometry               640x480 at (80,0)
+PASS     10.4f.02.m111-lfb.pattern                307200 pixels, 2 colours
+PASS     10.4f.02.m111-lfb.colours                all 2 as wanted
+PASS     10.4f.02.m103.geometry                   800x480 at (0,0)
+PASS     10.4f.02.m103.pattern                    384000 pixels, 16 colours
+PASS     10.4f.02.m103.colours                    all 16 as wanted
+PASS     10.4f.07.m103-start-120.geometry         800x480 at (0,0)
+PASS     10.4f.07.m103-start-120.pattern          384000 pixels, 16 colours
+PASS     10.4f.07.m103-start-120.colours          all 16 as wanted
+PASS     10.4f.02.m114-lfb.geometry               800x480 at (0,0)
+PASS     10.4f.02.m114-lfb.pattern                384000 pixels, 2 colours
+PASS     10.4f.02.m114-lfb.colours                all 2 as wanted
+PASS     10.4f.02.m102.geometry                   800x480 at (0,0)
+PASS     10.4f.02.m102.pattern                    384000 pixels, 16 colours
+PASS     10.4f.02.m102.colours                    all 16 as wanted
+PASS     regs.modex.read-plane1                   02
+PASS     regs.modex.read-plane3                   0f
+PASS     regs.modex.read-page2                    0d
+PASS     regs.pan.ar13                            03
+PASS     regs.retrace.counted                     30 to 120 a second
+PASS     regs.retrace.dac-read-back               ax=002a
+PASS     regs.modex.geometry                      640x480 at (80,0)
+PASS     regs.modex.pattern                       307200 pixels, 16 colours
+PASS     regs.modex.colours                       all 16 as wanted
+PASS     regs.modex.page2.geometry                640x480 at (80,0)
+PASS     regs.modex.page2.pattern                 307200 pixels, 16 colours
+PASS     regs.modex.page2.colours                 all 16 as wanted
+PASS     regs.split.geometry                      640x480 at (80,0)
+PASS     regs.split.pattern                       302080 pixels, 16 colours
+PASS     regs.split.colours                       all 16 as wanted
+PASS     regs.modex.latch-copy.geometry           640x480 at (80,0)
+PASS     regs.modex.latch-copy.pattern            307200 pixels, 16 colours
+PASS     regs.modex.latch-copy.colours            all 16 as wanted
+PASS     regs.pan12.geometry                      640x480 at (80,0)
+PASS     regs.pan12.pattern                       305760 pixels, 16 colours
+PASS     regs.pan12.colours                       all 16 as wanted
+PASS     regs.preset-row.shifted                  rows 1 to 24, 5 lines up
+PASS     regs.retrace-palette.geometry            640x400 at (80,40)
+PASS     regs.retrace-palette.pattern             256000 pixels, 32 colours
+PASS     regs.retrace-palette.colours             all 32 as wanted
+PASS     13.hd.bda-count                          02
+PASS     13.hd.08                                 ax=0000
+PASS     13.hd.08.ah                              00
+PASS     13.hd.08.sectors                         3f
+PASS     13.hd.08.heads                           0f
+PASS     13.hd.08.drives                          02
+PASS     13.hd.08.cylinders                       299, or 298 with one kept back
+PASS     13.hd.15                                 ax=032a
+PASS     13.hd.15.type                            03
+PASS     13.hd.00                                 ax=0050
+PASS     13.hd.0d                                 ax=0050
+PASS     13.hd.10                                 ax=0050
+PASS     13.hd.11                                 ax=0050
+PASS     13.hd.0c                                 ax=0050
+PASS     13.hd.09                                 ax=0050
+PASS     13.hd.01.after-success                   00
+PASS     13.hd.02.sector-0-refused                ax=0101
+PASS     13.hd.01.after-error                     01
+PASS     13.hd.02.cylinder-300-refused            ax=0101
+PASS     13.hd.02.first                           ax=0001
+PASS     13.hd.02.first.count                     01
+PASS     13.hd.02.first.data                      
+PASS     13.hd.02.over-a-head                     ax=0004
+PASS     13.hd.02.over-a-head.count               04
+PASS     13.hd.02.over-a-head.data                
+PASS     13.hd.02.over-a-cylinder                 ax=0004
+PASS     13.hd.02.over-a-cylinder.count           04
+PASS     13.hd.02.over-a-cylinder.data            
+PASS     13.hd.02.over-cylinder-255               ax=0002
+PASS     13.hd.02.over-cylinder-255.count         02
+PASS     13.hd.02.over-cylinder-255.data          
+PASS     13.hd.02.cylinder-256                    ax=0003
+PASS     13.hd.02.cylinder-256.count              03
+PASS     13.hd.02.cylinder-256.data               
+PASS     13.hd.02.last                            ax=0001
+PASS     13.hd.02.last.count                      01
+PASS     13.hd.02.last.data                       
+PASS     13.hd.02.127-sectors                     ax=007f
+PASS     13.hd.02.127-sectors.count               7f
+PASS     13.hd.02.127-sectors.data                
+PASS     13.hd.42.over-cylinder-255               ax=0000
+PASS     13.hd.42.over-cylinder-255.data          
+PASS     13.hd.03.over-a-head                     ax=0004
+PASS     13.hd.03.over-a-head.count               04
+PASS     13.hd.03.over-a-head.read-back           
+PASS     13.hd.03.cylinder-256                    ax=0001
+PASS     13.hd.03.cylinder-256.count              01
+PASS     13.hd.03.cylinder-256.read-back          
+PASS     13.hd.04                                 ax=0004
+PASS     13.hd.04.count                           04
+PASS     13.hd.41                                 ax=3004
+PASS     13.hd.41.bx                              aa55
+PASS     13.hd.41.packet-access                   0001
+PASS     13.hd.42                                 ax=0000
+PASS     13.hd.42.count-back                      0003
+PASS     13.hd.42.data                            
+PASS     13.hd.42.past-the-end-refused            ax=0100
+PASS     13.hd.43                                 ax=0000
+PASS     13.hd.43.read-by-chs                     
+PASS     13.hd.43.verify                          ax=0001
+PASS     13.hd.43.verify.read-back                
+PASS     13.hd.44                                 ax=0000
+PASS     13.hd.47                                 ax=0000
+PASS     13.hd.48                                 ax=0000
+PASS     13.hd.48.total                           00049d40
+PASS     13.hd.48.total-high                      00000000
+PASS     13.hd.48.bytes                           0200
+PASS     13.hd.48.edd2                            ax=0000
+PASS     13.hd.image-stray                        no sector changed but those written
+PASS     13.hd.image-written                      8 sectors written, all there: 1383,1384,1385,1386,2000,2001,2010,258048
+PASS     13.fd144.equipment-one-floppy            01
+PASS     13.fd144.08                              ax=0000
+PASS     13.fd144.08.type-1.44m-drive             04
+PASS     13.fd144.08.max-cylinder                 4f
+PASS     13.fd144.08.sectors                      12
+PASS     13.fd144.08.max-head                     01
+PASS     13.fd144.08.drives                       01
+PASS     13.fd144.08.table-sectors                12
+PASS     13.fd144.08.table-512                    02
+PASS     13.fd144.15                              ax=0100
+PASS     13.fd144.15.a-floppy                     1 or 2
+PASS     13.fd144.16.changed-or-not               0 or 6
+PASS     13.fd144.00                              ax=0000
+PASS     13.fd144.01                              00
+PASS     13.fd144.02.first                        ax=0001
+PASS     13.fd144.02.first.count                  01
+PASS     13.fd144.02.first.data                   
+PASS     13.fd144.02.over-a-head                  ax=0004
+PASS     13.fd144.02.over-a-head.count            04
+PASS     13.fd144.02.over-a-head.data             
+PASS     13.fd144.02.last                         ax=0001
+PASS     13.fd144.02.last.count                   01
+PASS     13.fd144.02.last.data                    
+PASS     13.fd144.02.whole-cylinder               ax=0024
+PASS     13.fd144.02.whole-cylinder.count         24
+PASS     13.fd144.02.whole-cylinder.data          
+PASS     13.fd144.02.over-a-cylinder              ax=0002
+PASS     13.fd144.02.over-a-cylinder.count        02
+PASS     13.fd144.02.over-a-cylinder.data         
+XFAIL    13.fd144.02.past-the-track-refused       ax=0001  [emulink: a sector past the end of the track reads the next track's]
+PASS     13.fd144.02.past-the-disk-refused        ax=8000
+PASS     13.fd144.03.three                        ax=0003
+PASS     13.fd144.03.three.count                  03
+PASS     13.fd144.03.three.read-back              
+PASS     13.fd144.03.over-a-head                  ax=0002
+PASS     13.fd144.03.over-a-head.count            02
+PASS     13.fd144.03.over-a-head.read-back        
+PASS     13.fd144.04                              ax=0002
+PASS     13.fd144.05                              ax=0012
+XFAIL    13.fd144.05.f6-in-the-sector             ax=00f6  [emulink: formatting a track writes nothing]
+PASS     13.fd144.18                              ax=0004
+PASS     13.fd144.b-absent-refused                ax=0101
+PASS     13.fd144.image-stray                     no sector changed but those written
+PASS     13.fd144.image-written                   5 sectors written, all there: 94,95,96,125,126
+PASS     13.fd720.equipment-one-floppy            01
+PASS     13.fd720.08                              ax=0000
+PASS     13.fd720.08.type-1.44m-drive             04
+PASS     13.fd720.08.max-cylinder                 4f
+PASS     13.fd720.08.sectors                      12
+PASS     13.fd720.08.max-head                     01
+PASS     13.fd720.08.drives                       01
+PASS     13.fd720.08.table-sectors                12
+PASS     13.fd720.08.table-512                    02
+PASS     13.fd720.15                              ax=0100
+PASS     13.fd720.15.a-floppy                     1 or 2
+PASS     13.fd720.16.changed-or-not               0 or 6
+PASS     13.fd720.00                              ax=0000
+PASS     13.fd720.01                              00
+PASS     13.fd720.02.first                        ax=0001
+PASS     13.fd720.02.first.count                  01
+PASS     13.fd720.02.first.data                   
+PASS     13.fd720.02.over-a-head                  ax=0004
+PASS     13.fd720.02.over-a-head.count            04
+PASS     13.fd720.02.over-a-head.data             
+PASS     13.fd720.02.last                         ax=0001
+PASS     13.fd720.02.last.count                   01
+PASS     13.fd720.02.last.data                    
+PASS     13.fd720.02.whole-cylinder               ax=0012
+PASS     13.fd720.02.whole-cylinder.count         12
+PASS     13.fd720.02.whole-cylinder.data          
+PASS     13.fd720.02.over-a-cylinder              ax=0002
+PASS     13.fd720.02.over-a-cylinder.count        02
+PASS     13.fd720.02.over-a-cylinder.data         
+XFAIL    13.fd720.02.past-the-track-refused       ax=0001  [emulink: a sector past the end of the track reads the next track's]
+PASS     13.fd720.02.past-the-disk-refused        ax=8000
+PASS     13.fd720.03.three                        ax=0003
+PASS     13.fd720.03.three.count                  03
+PASS     13.fd720.03.three.read-back              
+PASS     13.fd720.03.over-a-head                  ax=0002
+PASS     13.fd720.03.over-a-head.count            02
+PASS     13.fd720.03.over-a-head.read-back        
+PASS     13.fd720.04                              ax=0002
+PASS     13.fd720.05                              ax=0009
+XFAIL    13.fd720.05.f6-in-the-sector             ax=00f6  [emulink: formatting a track writes nothing]
+PASS     13.fd720.18                              ax=0004
+PASS     13.fd720.b-absent-refused                ax=0101
+PASS     13.fd720.image-stray                     no sector changed but those written
+PASS     13.fd720.image-written                   5 sectors written, all there: 49,50,51,62,63
+PASS     grid.mode-10h                            10
+PASS     grid.read-mode-0.plane-0                 every byte of 2000 cells
+PASS     grid.read-mode-0.plane-1                 every byte of 2000 cells
+PASS     grid.read-mode-0.plane-2                 every byte of 2000 cells
+PASS     grid.read-mode-0.plane-3                 every byte of 2000 cells
+PASS     grid.read-mode-1.foreground              every byte of 2000 cells
+PASS     grid.read-mode-1.background              every byte of 2000 cells
+PASS     grid.read-mode-1.no-plane                every byte of 2000 cells
+PASS     grid.a-map-mask.geometry                 640x350 at (80,65), within 640x350 at (80,65)
+PASS     grid.a-map-mask.text                     all 2000 cells
+PASS     grid.a-map-mask.colours                  all 2000 cells
+PASS     grid.b-set-reset.geometry                640x350 at (80,65), within 640x350 at (80,65)
+PASS     grid.b-set-reset.text                    all 2000 cells
+PASS     grid.b-set-reset.colours                 all 2000 cells
+PASS     grid.c-write-mode-2.geometry             640x350 at (80,65), within 640x350 at (80,65)
+PASS     grid.c-write-mode-2.text                 all 2000 cells
+PASS     grid.c-write-mode-2.colours              all 2000 cells
+PASS     grid.d-write-mode-3.geometry             640x350 at (80,65), within 640x350 at (80,65)
+PASS     grid.d-write-mode-3.text                 all 2000 cells
+PASS     grid.d-write-mode-3.colours              all 2000 cells
+PASS     grid.scroll-write-mode-1.geometry        640x350 at (80,65), within 640x350 at (80,65)
+PASS     grid.scroll-write-mode-1.text            all 2000 cells
+PASS     grid.scroll-write-mode-1.colours         all 2000 cells
+PASS     grid.bios-09h.geometry                   640x349 at (80,65), within 640x350 at (80,65)
+PASS     grid.bios-09h.text                       all 2000 cells
+PASS     grid.bios-09h.colours                    all 2000 cells
+PASS     grid.bios-06h.geometry                   640x350 at (80,65), within 640x350 at (80,65)
+PASS     grid.bios-06h.text                       all 2000 cells
+PASS     grid.bios-06h.colours                    all 2000 cells
+PASS     grid600.mode-10h                         10
+PASS     grid600.read-mode-0.plane-0              every byte of 2000 cells
+PASS     grid600.read-mode-0.plane-1              every byte of 2000 cells
+PASS     grid600.read-mode-0.plane-2              every byte of 2000 cells
+PASS     grid600.read-mode-0.plane-3              every byte of 2000 cells
+PASS     grid600.read-mode-1.foreground           every byte of 2000 cells
+PASS     grid600.read-mode-1.background           every byte of 2000 cells
+PASS     grid600.read-mode-1.no-plane             every byte of 2000 cells
+PASS     grid600.a-map-mask.geometry              640x350 at (80,125), within 640x350 at (80,125)
+PASS     grid600.a-map-mask.text                  all 2000 cells
+PASS     grid600.a-map-mask.colours               all 2000 cells
+PASS     grid600.b-set-reset.geometry             640x350 at (80,125), within 640x350 at (80,125)
+PASS     grid600.b-set-reset.text                 all 2000 cells
+PASS     grid600.b-set-reset.colours              all 2000 cells
+PASS     grid600.c-write-mode-2.geometry          640x350 at (80,125), within 640x350 at (80,125)
+PASS     grid600.c-write-mode-2.text              all 2000 cells
+PASS     grid600.c-write-mode-2.colours           all 2000 cells
+PASS     grid600.d-write-mode-3.geometry          640x350 at (80,125), within 640x350 at (80,125)
+PASS     grid600.d-write-mode-3.text              all 2000 cells
+PASS     grid600.d-write-mode-3.colours           all 2000 cells
+PASS     grid600.scroll-write-mode-1.geometry     640x350 at (80,125), within 640x350 at (80,125)
+PASS     grid600.scroll-write-mode-1.text         all 2000 cells
+PASS     grid600.scroll-write-mode-1.colours      all 2000 cells
+PASS     grid600.bios-09h.geometry                640x349 at (80,125), within 640x350 at (80,125)
+PASS     grid600.bios-09h.text                    all 2000 cells
+PASS     grid600.bios-09h.colours                 all 2000 cells
+PASS     grid600.bios-06h.geometry                640x350 at (80,125), within 640x350 at (80,125)
+PASS     grid600.bios-06h.text                    all 2000 cells
+PASS     grid600.bios-06h.colours                 all 2000 cells
+
+info     10.11.30.pointer-bh00                    c000:97e0
+info     10.11.30.pointer-bh01                    c000:75e0
+info     10.11.30.pointer-bh02                    c000:85e0
+info     10.11.30.pointer-bh03                    c000:93e0
+info     10.11.30.pointer-bh04                    c000:97e0
+info     10.11.30.pointer-bh05                    c000:75d1
+info     10.11.30.pointer-bh06                    c000:75e0
+info     10.11.30.pointer-bh07                    c000:75d0
+info     10.00.m05.colours                        0=0000(0,0,0) 1=57ff(10,63,31) 2=fabf(31,21,31) 3=ffff(31,63,31)
+info     10.00.m0f.colours                        0=0000(0,0,0) 1=ad55(21,42,21) 4=0000(0,0,0) 5=ad55(21,42,21)
+info     10.10.18.port-3c6                        0f
+info     10.0b.ar0                                01
+info     10.12.10.cx-features-switches            0009
+info     10.1b.m03.mode-ctl-3x8                   00
+info     10.1b.m03.palette-3x9                    00
+info     10.1b.m03.char-blocks                    00
+info     10.1b.m03.misc-flags                     00
+info     10.1b.m03.save-flags                     00
+info     10.1b.table.char-blocks                  02
+info     10.1b.table.active-blocks                08
+info     10.1c.00.blocks                          000e
+info     10.4f.256k.00.version                    0300
+info     10.4f.256k.00.memory-64k                 0004
+info     10.4f.256k.00.modes                      0017
+info     10.4f.256k.00.vbe-mode                   0100
+info     10.4f.256k.00.vbe-mode                   0102
+info     10.4f.256k.00.vbe-mode                   010d
+info     10.4f.256k.00.vbe-mode                   010e
+info     10.4f.256k.00.vbe-mode                   010f
+info     10.4f.256k.00.vbe-mode                   0140
+info     10.4f.256k.00.vbe-mode                   0146
+info     10.4f.256k.00.vbe-modes                  0007
+info     10.4f.00.version                         0300
+info     10.4f.00.capabilities                    00000001
+info     10.4f.00.oem                             SeaBIOS VBE(C) 2011
+info     10.4f.00.vendor                          SeaBIOS Developers
+info     10.4f.00.product                         SeaBIOS VBE Adapter
+info     10.4f.00.modes                           001f
+info     10.4f.01.mode-0100                       0280x0190x08 model 04 attributes 00bb
+info     10.4f.01.mode-0101                       0280x01e0x08 model 04 attributes 00bb
+info     10.4f.01.mode-0102                       0320x0258x04 model 03 attributes 003b
+info     10.4f.01.mode-0103                       0320x0258x08 model 04 attributes 00bb
+info     10.4f.01.mode-010d                       0140x00c8x0f model 06 attributes 00bb
+info     10.4f.01.mode-010e                       0140x00c8x10 model 06 attributes 00bb
+info     10.4f.01.mode-010f                       0140x00c8x18 model 06 attributes 00bb
+info     10.4f.01.mode-0110                       0280x01e0x0f model 06 attributes 00bb
+info     10.4f.01.mode-0111                       0280x01e0x10 model 06 attributes 00bb
+info     10.4f.01.mode-0112                       0280x01e0x18 model 06 attributes 00bb
+info     10.4f.01.mode-0113                       0320x0258x0f model 06 attributes 00bb
+info     10.4f.01.mode-0114                       0320x0258x10 model 06 attributes 00bb
+info     10.4f.01.mode-0140                       0140x00c8x20 model 06 attributes 00bb
+info     10.4f.01.mode-0141                       0280x0190x20 model 06 attributes 00bb
+info     10.4f.01.mode-0146                       0140x00c8x08 model 04 attributes 00bb
+info     10.4f.01.mode-0000                       0028x0019x04 model 00 attributes 002f
+info     10.4f.01.mode-0001                       0028x0019x04 model 00 attributes 002f
+info     10.4f.01.mode-0002                       0050x0019x04 model 00 attributes 002f
+info     10.4f.01.mode-0003                       0050x0019x04 model 00 attributes 002f
+info     10.4f.01.mode-0004                       0140x00c8x02 model 01 attributes 003b
+info     10.4f.01.mode-0005                       0140x00c8x02 model 01 attributes 003b
+info     10.4f.01.mode-0006                       0280x00c8x01 model 01 attributes 003b
+info     10.4f.01.mode-0007                       0050x0019x04 model 00 attributes 0027
+info     10.4f.01.mode-000d                       0140x00c8x04 model 03 attributes 003b
+info     10.4f.01.mode-000e                       0280x00c8x04 model 03 attributes 003b
+info     10.4f.01.mode-000f                       0280x015ex01 model 03 attributes 003b
+info     10.4f.01.mode-0010                       0280x015ex04 model 03 attributes 003b
+info     10.4f.01.mode-0011                       0280x01e0x01 model 03 attributes 003b
+info     10.4f.01.mode-0012                       0280x01e0x04 model 03 attributes 003b
+info     10.4f.01.mode-0013                       0140x00c8x08 model 04 attributes 00bb
+info     10.4f.01.mode-006a                       0320x0258x04 model 03 attributes 003b
+info     10.4f.06.get-lines                       0666
+info     10.4f.04.blocks                          000f
+info     10.4f.0a.length                          000f
+info     10.4f.01.m101.lfb                        feb00000
+info     regs.retrace.per-second                  0037
+info     regs.retrace.display-enable-changes      006e
+info     13.hd.vector                             f000e3fe
+info     13.hd.08.max-cylinder                    012a
+info     13.hd.15.sectors                         00049950
+info     13.hd.14.ax                              0050
+info     13.hd.01.after-error-ax                  0101
+info     13.hd.41.version                         30
+info     13.hd.41.cx-interfaces                   0007
+info     13.hd.48.size                            001a
+info     13.hd.48.flags                           0002
+info     13.hd.48.cylinders                       0000012c
+info     13.hd.48.heads                           00000010
+info     13.hd.48.sectors                         0000003f
+info     13.hd.48.edd2.dpte                       e000f7c8
+info     13.hd.45.ax                              0000
+info     13.hd.45.carry                           0000
+info     13.hd.46.ax                              b200
+info     13.hd.46.carry                           ffff
+info     13.hd.49.ax                              0000
+info     13.hd.49.carry                           0000
+info     13.hd.4e.ax                              0108
+info     13.hd.4e.carry                           ffff
+info     13.hd80.08.cx                            1e3f
+info     13.hd80.08.dx                            0f02
+info     13.fd144.equipment                       0025
+info     13.fd144.08.type                         04
+info     13.fd144.15.type                         01
+info     13.fd144.16.ax                           0600
+info     13.fd144.16.carry                        ffff
+info     13.fd144.02.past-the-track.data          cylinder 0, head 1, sector 1
+info     13.fd144.02.over-64k-boundary.ax         0002
+info     13.fd144.02.over-64k-boundary.carry      0000
+info     13.fd144.17.ax                           0104
+info     13.fd144.17.carry                        ffff
+info     13.fd144.18.table-sectors                12
+info     13.fd144.b-absent.ax                     0101
+info     13.fd144.image-ignored                   18 sectors not looked at (formatted), of which 0 changed
+info     13.fd720.equipment                       0025
+info     13.fd720.08.type                         04
+info     13.fd720.15.type                         01
+info     13.fd720.16.ax                           0600
+info     13.fd720.16.carry                        ffff
+info     13.fd720.02.past-the-track.data          cylinder 0, head 1, sector 1
+info     13.fd720.02.over-64k-boundary.ax         0002
+info     13.fd720.02.over-64k-boundary.carry      0000
+info     13.fd720.17.ax                           0104
+info     13.fd720.17.carry                        ffff
+info     13.fd720.18.table-sectors                12
+info     13.fd720.b-absent.ax                     0101
+info     13.fd720.image-ignored                   9 sectors not looked at (formatted), of which 0 changed
+
+765 passed, 6 failed as expected, 0 failed, 0 passed unexpectedly, 0 missing, 0 not in the list

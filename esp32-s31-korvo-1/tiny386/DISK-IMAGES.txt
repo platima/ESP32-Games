@@ -1,0 +1,205 @@
+Disk images for tiny386 on the Korvo-1
+======================================
+
+Where a Windows disk image can live on the card, and how to make one on the PC so
+that what Windows finds on the board is what it was installed on.
+
+What has been checked, and what has not
+=======================================
+Nothing in this file has been done on the board, and nothing in it has been done
+with Windows: I had no Windows media, and was not to fetch any.
+
+* The partitioning in part 1 was tried with the board's own fdisk and mkdosfs: the
+  BusyBox 1.38.0 binary out of the be5b725 card image, run under qemu-riscv32-static
+  against a copy of that card image grown to 8 GB. The keys below are the ones that
+  worked there, and one that did not is called out. The kernel's part (seeing the new
+  partition after a reboot, mounting it) was not tried.
+* Part 2 is put together from tiny386's own README and what its sources do. The
+  Windows build of tiny386 was not run. The steps inside Windows setup are the usual
+  ones and are from memory.
+
+How big
+=======
+The card's FAT partition is 64 MiB and the root partition has about 68 MiB free once
+the swap file is on it, so neither holds a Windows image.
+
+  Windows 95, compact or typical install      a 300 to 500 MB image is roomy
+  Windows 98 SE                               500 MB to 1 GB
+
+One FAT16 partition goes up to 2 GB, and the first Windows 95 (and its "A" update)
+knows nothing else. A file on a FAT32 partition of the card can be 4 GB less a byte.
+A 2 GB partition on the card is plenty for one image of either and a spare.
+
+The emulator's disk has 16 heads and 63 sectors a track and as many cylinders as the
+file is long (ide.c), on the PC and on the board alike, so an image moves between
+the two as it is.
+
+1. A partition on the card
+==========================
+A card written from sdcard.img of be5b725 has an MBR with two partitions and nothing
+after them:
+
+  Device      Start     End  Sectors  Size  Id  Type
+  mmcblk0p1    8192  139263   131072   64M   c  FAT32, "KORVO_SD", mounted on /mnt/sd
+  mmcblk0p2  139264  532479   393216  192M  83  ext4, the root
+
+The new one goes behind them, as partition 3, starting at sector 532480. That is
+the 260 MiB mark, and a multiple of 4 MiB like the other two starts (the card's
+erase blocks). FAT32, so that the PC can put the image on it through a card reader.
+
+Either way, look first. If the table on your card does not read as above, stop: the
+numbers below are for that layout and no other.
+
+On the board
+------------
+     fdisk -u -l /dev/mmcblk0
+
+"-u" makes fdisk count in sectors. Then, with nothing running that you care about:
+
+     fdisk -u /dev/mmcblk0
+       n                      a new partition
+       p                      primary
+       3                      number 3
+       532480                 first sector. TYPE IT. What fdisk offers is 63: the
+                              gap in front of partition 1, where nothing fits
+       +2048M                 the size: 2 GiB. A smaller card: what fits
+       t                      its type
+       3
+       c                      Win95 FAT32 (LBA)
+       p                      print the table, and read it:
+
+  Device       StartLBA     EndLBA    Sectors  Size Id Type
+  mmcblk0p1        8192     139263     131072 64.0M  c Win95 FAT32 (LBA)
+  mmcblk0p2      139264     532479     393216  192M 83 Linux
+  mmcblk0p3      532480    4726783    4194304 2048M  c Win95 FAT32 (LBA)
+
+       w                      write it, if lines 1 and 2 are as they were
+                              (q leaves without writing anything)
+
+fdisk then says that re-reading the partition table failed and that the kernel still
+uses the old one. That is expected: the root is on this card. Reboot:
+     sync
+     reboot
+and then
+     ls /dev/mmcblk0p3
+     mkdosfs -n WIN9X /dev/mmcblk0p3
+     mkdir -p /mnt/win
+     mount -t vfat -o rw,noatime /dev/mmcblk0p3 /mnt/win
+BusyBox's mkdosfs makes FAT32 and nothing else, which is what is wanted. The mount is
+by hand after each boot; it is two words with the up arrow.
+
+In the trial, fdisk changed nothing but the third entry of the table: the first two
+entries and every byte from sector 1 to the 260 MiB mark were the same afterwards.
+
+On the PC
+---------
+Windows 10 and 11 handle more than one partition on a card. In Disk Management, find
+the card by its size, and in the unallocated space behind the two partitions make a
+New Simple Volume: 2048 MB, FAT32, label WIN9X. Leave the 192 MB partition without a
+drive letter alone, and say no if Windows offers to format it or to initialise the
+disk: that one is the board's root. Windows does not make FAT32 volumes over 32 GB,
+which is no loss here.
+
+Losing power
+------------
+A FAT partition that was mounted when the board lost power is marked dirty, and the
+kernel says so at every mount from then on; it mounts all the same. The image inside
+is another matter: what the guest wrote in the last seconds may not be on the card.
+The emulator asks the kernel to put the guest's writes on the card once the guest
+has been quiet for two seconds, and again when it ends, so shut Windows down and wait
+for the prompt before pulling the plug.
+
+2. Windows into an image, on the PC
+===================================
+The image is made with tiny386 on the PC, so that the machine Windows finds on the
+board (the same BIOS, VGA, IDE controller, keyboard, mouse, sound and network cards)
+is the one it was installed on. Windows 95 first: it is the one tiny386's own small
+boards run, and it needs less memory than Windows 98.
+
+What you need
+-------------
+* tiny386 for Windows: tiny386.exe in the win32 folder of tiny386.tar.xz, from
+  https://github.com/hchunhui/tiny386/releases . That page keeps one rolling build;
+  the one of 2026-10-08 is commit 9ed786b, the commit the board's binary is built
+  from (tiny386.tar.xz sha256 24652e94...0bbad4, win32/tiny386.exe 8cdbd21c...3d37b0).
+  A later one will most likely do.
+* bios.bin and vgabios.bin: the two beside this file, built from source with the
+  BIOS fixes (BUILD.txt, "The BIOS"), not the two in that archive. Use the same
+  pair on the PC and on the board.
+* Your Windows 95 CD as an image file (win95.iso), your boot floppy as an image
+  (boot.img), and your key. A Windows 98 start-up floppy does as the boot floppy
+  for a Windows 95 CD and has a CD-ROM driver on it, which the Windows 95 one has
+  not.
+
+An empty disk, in a folder with all of the above (400 MB here):
+     fsutil file createnew win95.img 419430400
+
+A file for tiny386, win95-pc.ini (conf/win95-pc.ini is this):
+     [pc]
+     bios = bios.bin
+     vga_bios = vgabios.bin
+     mem_size = 16M
+     vga_mem_size = 256K
+     fda = boot.img
+     cdb = win95.iso
+     hda = win95.img
+     fill_cmos = 1
+
+     [display]
+     width = 720
+     height = 480
+
+     [cpu]
+     gen = 3
+     fpu = 0
+
+16M is for setup, which is slow and checks how much there is; the board will give
+the same installation less, and Windows takes what it finds at each start. gen = 3
+and fpu = 0 are what tiny386's own boards use for Windows 95, and they should be the
+same on the PC as on the board, since Windows looks at the processor when it is
+installed.
+
+     tiny386.exe win95-pc.ini
+
+Ctrl+] gives the window the keyboard and the mouse and takes them back. Ctrl+[ opens
+a small panel in which the floppy and the CD can be changed while it runs.
+
+Inside
+------
+* From the boot floppy: FDISK, one primary DOS partition of the whole disk, made
+  active. Restart (close the window and start it again), then FORMAT C: /S.
+* Copy the WIN95 folder of the CD to the hard disk and run setup from there
+  (COPY D:\WIN95\*.* C:\WIN95, then C:\WIN95\SETUP). Windows then never asks for
+  the CD again, which matters on a board with no CD.
+* tiny386's README has two notes on Windows 95. If setup says there are 0 bytes of
+  memory, start it as SETUP /IM. If Windows stops with a "protection error" when it
+  starts, the installation needs patching with patcher9x
+  (https://github.com/JHRobotics/patcher9x); that is a fault of Windows 95 on fast
+  processors, which the PC is and the board is not, but an image that will not start
+  on the PC cannot be finished there.
+* For the display, leave the standard VGA driver: 640x480 in 16 colours. On the
+  board that is the full height of the panel with 80 pixels of black either side.
+  Anything taller than 480 lines is cut off at the bottom, and anything with more
+  colours than 16 needs more video memory than the 256K above. The emulator's VGA
+  takes VBE drivers too (it is the Bochs one); I have not looked for one that suits.
+* For the hard disk, tiny386's fill_cmos = 1 is there so that Windows does not fall
+  back to "MS-DOS compatibility mode". Leave it in.
+* Shut Windows down from its Start menu. tiny386 ends when Windows has switched the
+  machine off; if it sits at "It is now safe to turn off your computer", close the
+  window.
+
+Then take out what the board will not have: in win95-pc.ini's terms the floppy and
+the CD. Start it once more on the PC without those two lines and let Windows settle,
+then shut it down again.
+
+3. Onto the board
+=================
+Copy win95.img to the new partition of the card (WIN9X), and on the board:
+     mount -t vfat -o rw,noatime /dev/mmcblk0p3 /mnt/win
+     cd /mnt/sd/tiny386
+     /root/tiny386 -log /mnt/sd/tiny386/win95.log win95.ini
+with conf/win95.ini, which differs from the PC's in three lines: no floppy and no
+CD, the image at /mnt/win/win95.img, and mem_size = 4M. Whether 4M is enough for
+Windows 95 to be of any use, and whether the board can spare more, is what the
+README and TEST-PLAN.txt are about. Keep a copy of the image on the PC: the first
+start on the board will change it, and a start that is cut short may break it.

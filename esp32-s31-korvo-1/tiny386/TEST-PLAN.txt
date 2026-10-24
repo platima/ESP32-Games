@@ -1,0 +1,204 @@
+Trying tiny386 on the Korvo-1
+=============================
+
+Where things stand
+==================
+Nothing here has run on the board. The binary boots FreeDOS to a prompt under
+qemu-riscv32-static, from the hard disk image and from FreeDOS's own boot floppy, on a
+pseudo terminal and on a fake copy of the panel's console (BUILD.txt, "Tests"). No
+Windows has been near it.
+
+What the board can answer and I cannot, in the order it matters:
+  1. How much memory is there to give a guest? (steps 1 and 3)
+  2. How fast is the emulated processor? My guess is 130 to 310 thousand instructions
+     a second, depending on what the guest is doing: an IBM PC to a slow AT. (steps
+     2, 3 and 6)
+  3. Does the board's processor do unaligned loads and stores itself? (step 2)
+  4. Does the picture come up on the panel, and do the keys work? (steps 5 and 7)
+Each step below says what to send back. The lines that begin "tiny386:" at the end
+of a run are the ones I am after; -log puts the emulator's own chatter in a file.
+
+Getting it onto the board
+=========================
+On the card's FAT partition (KORVO_SD, /mnt/sd on the board), make a folder tiny386
+with these in it:
+     tiny386-korvo            the emulator
+     tiny386-korvo-ua         the same, leaving unaligned loads and stores to the
+                              processor: only if step 2 says so
+     bios.bin  vgabios.bin
+     freedos-hd.img           16 MB, FreeDOS 1.4, boots to C:\>
+     freedos.ini  bench.ini   from conf/
+That is 18 MB. Then at the panel:
+     cp /mnt/sd/tiny386/tiny386-korvo /root/tiny386
+     chmod +x /root/tiny386
+     cd /mnt/sd/tiny386
+Everything below is run from that folder, where the .ini files name their files.
+
+If it goes wrong
+================
+The emulator cannot hang on a guest: it looks at the keyboard between every 4,096
+instructions it carries out, whatever the guest is doing. So the way out is always
+there:
+     Ctrl+Alt+Backspace       with the picture on the panel
+     Ctrl+]                   with -term
+and -time N ends any run after N seconds by itself. The first runs below all use it.
+
+If the emulator is killed (the kernel does that when memory runs out) the console
+guard, a second small process, puts the console back in text mode. If the panel is
+ever left dark or deaf all the same:
+  * type, blind:    /root/tiny386 --fix-console    and Enter
+  * then, if what you type does not show:    reset    and Enter
+  * failing that, the power. The card's FAT partition is then marked dirty (the
+    kernel says so at each mount and carries on), and a guest that was writing to
+    its disk image may find it damaged: keep copies of images you care about.
+
+From another login (ssh), "killall tiny386" ends it cleanly. "killall -9 tiny386"
+takes the guard down with it: kill the one process by its number if it has to be -9.
+
+1. How much memory there is
+===========================
+Before anything else, and with nothing of mine running:
+     free -k
+     grep -E 'MemTotal|MemFree|MemAvailable|Buffers|^Cached|Swap|Slab' /proc/meminfo
+     ps -o pid,rss,vsz,comm
+The second is the one that decides things: MemAvailable is what a guest can have
+without the board swapping, less the megabyte the emulator allows for itself. Send me
+all three.
+(A photo of the panel does; so does adding "> /mnt/sd/tiny386/mem.txt" to each, with
+>> for the second and third.)
+
+Then the same with the things stopped that a guest does not need, to see what they
+give back. None of this lasts beyond a reboot:
+     /etc/init.d/S40wifi stop
+     /etc/init.d/S50dropbear stop
+     /etc/init.d/S50crond stop
+     /etc/init.d/S02klogd stop
+     /etc/init.d/S01syslogd stop
+     sync; echo 3 > /proc/sys/vm/drop_caches
+     free -k
+     grep MemAvailable /proc/meminfo
+     ps -o pid,rss,vsz,comm
+The last line of the first block drops what the kernel has cached of files, which it
+would do by itself when memory is asked for. Stopping the Wi-Fi stops ssh too.
+
+2. What the board's processor costs
+===================================
+     /root/tiny386 --hostbench | tee hostbench.txt
+A minute or so. It touches 2 MiB of its own memory and nothing else: not the screen,
+not the console. Ctrl+C ends it. It times loads and stores of each size, in the cache
+and out of it, aligned and one byte off, and two things the emulator asks the kernel
+for all the time. Run it at the panel, with the LCD on, since that is when stores are
+slow. Send me hostbench.txt. Its last lines say which of the two binaries to use: if
+a load or a store "one byte off" takes many times as long as an aligned one, the
+processor is trapping for each of them and tiny386-korvo is the right one (it never
+makes one); if not, tiny386-korvo-ua may be a little faster and is worth a go at
+step 3. Until this has run, use tiny386-korvo.
+
+3. FreeDOS with no screen
+=========================
+     /root/tiny386 -none -insns 5 freedos.ini
+No screen, no keyboard, nothing done to the console: it carries out five million
+instructions of the BIOS and of FreeDOS starting, and stops. Half a minute by my
+guess. Ctrl+C ends it early, with the same lines. It prints, before:
+     tiny386: guest memory 2048 KiB + video memory 256 KiB = 2304 KiB, and about ...
+     tiny386: this machine has ... KiB available and ... KiB of swap free
+and after:
+     tiny386: 5000000 instructions in ... s of running: 0.... million a second
+     tiny386: beside that, ... s with the guest halted ...
+     tiny386: most memory this process had in use: ... KiB, of which the guest's 2304
+     tiny386: available memory was ... KiB before and is ... KiB now ...
+All of those, please. The third is the speed; the fifth less 2304 is what the
+emulator itself takes, which I have only worked out (about 550 KiB; it allows itself
+1024). If it stops at
+"that is not enough", there is less than 3.3 MB available: tell me the numbers and
+go back to step 1's second half.
+
+4. FreeDOS on the text console
+==============================
+     /root/tiny386 -term -time 300 -log term.log freedos.ini
+FreeDOS's text screen, drawn with the console's own characters in the top left of
+the panel, over whatever was there; still no graphics mode. After a few seconds the
+BIOS's lines, then FreeDOS's, then, a minute or so from the start by my guess:
+     FreeDOS on tiny386. OFF leaves the emulator.
+     VGA12, VGA12T and VGA13 draw a picture each; a key ends it.
+     C:\>
+Try   dir   and   mem   and   ver . Then   off   which has FreeDOS switch the
+machine off, and the emulator ends and prints its lines. Ctrl+] ends it at any time,
+and -time 300 does after five minutes. F1 to F5 type a letter in this mode; the
+other keys should do what they say.
+Tell me: how long to the prompt, whether typing keeps up, and the lines at the end.
+
+5. FreeDOS on the panel
+=======================
+     /root/tiny386 -time 300 -log panel.log freedos.ini
+Now with the picture: the console goes to graphics mode, and the same text screen is
+drawn by the emulator's VGA, 720x400 in the middle of the panel with a black border
+of 40 pixels. The same things to try. Ctrl+Alt+Backspace ends it; so does off; so
+does the timer.
+Tell me: whether the picture is there, sharp and in the middle; whether every key
+does what it says (letters, digits, Enter, Backspace, the arrows at the prompt: up
+brings the last command back); whether the console is back afterwards, with the
+"tiny386:" lines readable; and those lines.
+
+Then two pictures, which are programs on the FreeDOS disk. Start the emulator again,
+without -time if all was well, and at the prompt:
+     vga13
+320x200 in 256 colours, drawn as 640x400: the 256 colours of the palette as thin
+upright bars, side by side. A key ends it. Then
+     vga12
+640x480 in 16 colours, which is what Windows will use: sixteen bands from top to
+bottom of the panel, with 80 black pixels either side, and a white box that walks
+along the top one for some seconds. That box is the nearest thing here to a mouse
+pointer: tell me whether it moves smoothly or in jumps. A key ends it. Then
+     vga12t
+the same picture, and after the box has walked, forty letters in yellow across one
+of the lower bands, printed by the BIOS one at a time. tiny386 as released clears
+the whole screen for each letter; this build should not. Tell me whether the picture
+stays put while they appear, or flashes black.
+If any of the pictures looks wrong (colours, stripes, bits left behind), try the same
+again with   -plainvga   after /root/tiny386, and tell me whether that one is right.
+With -plainvga the letters of vga12t do flash: that is tiny386's own way.
+
+6. The speed, piece by piece
+============================
+     /root/tiny386 -term -marks bench.ini
+and at the C:\> prompt
+     bench
+bench.ini gives the guest 4 MB, which BENCH wants; the emulator asks for 5.25 MB of
+the board's for that, so do this one when step 1 says there is that much. BENCH does
+nine pieces of work, the last four in 32-bit protected mode with paging on, which is
+where Windows lives. It prints nothing. The emulator times each piece and ends by
+itself when they are done: five minutes or so by my guess, of which the screen shows
+nothing. Then:
+     tiny386: a1 16-bit arithmetic in registers       2097152 instructions in ...
+     ...
+     tiny386: a9 translation cache miss every time    1028096 instructions in ...
+Nine lines, and I would like all of them: they are the same pieces I counted
+instructions and stores for, and with them the guess at the top of this file becomes
+a measurement, for this emulator and for anything else on this board. BUILD.txt,
+"Speed", has my column to put beside yours.
+
+7. Odds and ends, when the rest works
+=====================================
+* A USB mouse, plugged in before the emulator starts. FreeDOS on this image has no
+  mouse driver, so there is nothing to see yet; panel.log will say "SDL fbcon: mouse
+  on /dev/input/eventN" or "no mouse found".
+* The console guard. This kills the emulator outright after 90 seconds, as the kernel
+  would, and the console should come back in text mode a moment later, with a prompt
+  and no "tiny386:" lines:
+     ( sleep 90; kill -9 $(cat /tmp/t.pid) ) &
+     sh -c 'echo $$ > /tmp/t.pid; exec /root/tiny386 freedos.ini'
+  (The first line is the timer; the second starts the emulator and leaves its
+  process number where the timer finds it.) If the panel stays dark: "If it goes
+  wrong" above, and tell me.
+* FreeDOS from its own boot floppy, as freedos.org hands it out, if you would like
+  to see a disk that I had no hand in: conf/freedos-floppy.ini says how.
+
+8. Windows
+==========
+Not before steps 1, 3 and 6 have answers: they say whether there is any point, and
+how much memory to give it. Then DISK-IMAGES.txt: a partition on the card for the
+image, Windows 95 installed into the image on the PC with tiny386 itself, and
+conf/win95.ini. Use -log, and a timer for the first start. What I expect, and it is
+no more than that: Windows 95 with 4 MB starts, slowly enough to count in tens of
+minutes, and pages to its swap file all the while.

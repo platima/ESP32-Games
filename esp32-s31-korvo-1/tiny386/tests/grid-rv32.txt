@@ -1,0 +1,78 @@
+Host work for each piece of BGRID, the whole of it (RV32, counted from a trace)
+
+                                         guest       host     loads    stores  host a     ms
+                                        instr.     instr.                       guest       
+a: map mask, a plane at a time         1451772  161516293  40374137  21521478   111.3   5490
+b: write mode 0, set/reset              668626   91514910  22820358  11163031   136.9   2971
+c: write mode 2                         619402   87616927  22113329  10715477   141.5   2848
+d: write mode 3, rotate                 541464   80299202  19890645   9391042   148.3   2553
+a row up, write mode 1; clear            41023    4770283   1223784    697460   116.3    170
+BIOS: AH=02h and 09h, 2000 cells      17813008 2337041248 621957500 327491199   131.2  81604
+BIOS: AH=06h, a row up                   18675   17755556   3976546    587905   950.8    363
+
+"ms" is a guess: 16 ns for each instruction and 135 ns for each store.
+
+-- a: map mask, a plane at a time: where the host instructions and stores were --
+   cpu_exec1                     114800101 instructions  16922996 stores
+   vga_mem_write                   9647308 instructions    112178 stores
+   modsib                          6764848 instructions    695964 stores
+   translate.constprop.0           6239520 instructions    831936 stores
+   translate.constprop.1           5554620 instructions    740616 stores
+   fetch8                          4247636 instructions    910194 stores
+
+-- b: write mode 0, set/reset: where the host instructions and stores were --
+   cpu_exec1                      47994692 instructions   7074195 stores
+   __GE_helper8                   11198282 instructions   1127635 stores
+   vga_mem_write                   4793853 instructions     55752 stores
+   translate.constprop.0           4754040 instructions    633872 stores
+   modsib                          3655043 instructions    384036 stores
+   translate.constprop.1           2903130 instructions    387084 stores
+
+-- c: write mode 2: where the host instructions and stores were --
+   cpu_exec1                      44734947 instructions   6508001 stores
+   __GE_helper8                   10959811 instructions   1089550 stores
+   translate.constprop.0           6197430 instructions    826324 stores
+   vga_mem_write                   3662329 instructions     56297 stores
+   modsib                          3626974 instructions    380012 stores
+   translate.constprop.1           2762400 instructions    368320 stores
+
+-- d: write mode 3, rotate: where the host instructions and stores were --
+   cpu_exec1                      43035261 instructions   5938371 stores
+   __GE_helper8                   10343504 instructions   1007694 stores
+   vga_mem_write                   5451936 instructions     83664 stores
+   translate.constprop.0           4309950 instructions    574660 stores
+   modsib                          3232434 instructions    333122 stores
+   vga_mem_read                    3136672 instructions     82544 stores
+
+-- a row up, write mode 1; clear: where the host instructions and stores were --
+   cpu_exec1                       3314220 instructions    516058 stores
+   modsib                           332702 instructions     40032 stores
+   __GE_helper8                     169550 instructions     23686 stores
+   translate.constprop.1            154920 instructions     20656 stores
+   translate.constprop.0            147840 instructions     19712 stores
+   fetch16                          126346 instructions     20328 stores
+
+-- BIOS: AH=02h and 09h, 2000 cells: where the host instructions and stores were --
+   cpu_exec1                    1588663734 instructions 233055954 stores
+   __GE_helper8                  119585253 instructions  14184970 stores
+   fetch8                        110826531 instructions  23748114 stores
+   translate.constprop.0          70227270 instructions   9363636 stores
+   fetch32                        67286908 instructions   8845330 stores
+   modsib                         53423802 instructions   6414230 stores
+
+-- BIOS: AH=06h, a row up: where the host instructions and stores were --
+   vga_mem_write                   8166560 instructions     94960 stores
+   cpu_exec1                       3731572 instructions    252589 stores
+   vga_mem_read                    3438240 instructions     90480 stores
+   iomem_write8                     569760 instructions         0 stores
+   iomem_read8                      542880 instructions         0 stores
+   __GE_helper32                    316410 instructions     42682 stores
+
+MODE 10h, 640x350 in 16 colours, the grid of text on the screen (BGRID pic)
+                                     instructions      loads     stores       ms
+first picture after a mode change         3074146     483260     430452      107
+the one after that                         271052      63314        426        4
+told to draw everything                   2623627     483177      28423       46
+nothing has changed                        271052      63314        426        4
+
+"ms" is a guess: 16 ns for each instruction and 135 ns for each store.

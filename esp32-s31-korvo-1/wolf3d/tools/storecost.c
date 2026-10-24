@@ -17,6 +17,9 @@
  *
  * Build:
  *   $M/host/bin/riscv32-buildroot-linux-musl-gcc -O2 -static -o storecost-korvo storecost.c
+ *   $M/host/bin/riscv32-buildroot-linux-musl-strip storecost-korvo
+ *
+ * The strip is what gives the bytes of the released storecost-korvo.
  *
  * Offered under the MIT licence.
  */

@@ -1,0 +1,18 @@
+Host work for one guest instruction (x86-64, counted by callgrind)
+
+piece of work                             guest     host   loads  stores  thousand
+                                         instr.   instr.                  a second
+16-bit arithmetic in registers          2097152     82.3    21.5   15.53       293
+16-bit loads and stores                 1769472    162.7    39.0   27.21       159
+16-bit calls and stack                  2555904    111.4    27.4   18.08       237
+rep movsw/stosw, for each BYTE         32768000     18.8     5.0    2.01      1746
+DOS calls (int 21h)                     5712779    128.9    32.4   21.27       203
+32-bit arithmetic, paging on            2002944     81.9    21.6   15.16       298
+32-bit loads and stores, paging on      1769472    179.3    44.0   29.21       147
+32-bit calls and stack, paging on       2596864    133.0    32.9   19.09       213
+translation cache miss every time       1028096    171.7    42.1   31.32       143
+
+"thousand a second" is a guess: 16 ns for each host instruction and 135 ns for
+each store, which is what three frame rates of another program on the
+ESP32-S31-Korvo-1 came to, with counts of this kind. Nothing here was timed on
+that board.

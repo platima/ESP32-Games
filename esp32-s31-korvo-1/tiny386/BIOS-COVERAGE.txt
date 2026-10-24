@@ -1,0 +1,669 @@
+How much of the PC BIOS tiny386 gives a DOS program
+=====================================================
+
+Update, 2026-10-20: mode 10h as a grid of text, written straight in
+===================================================================
+Read this first; the two updates under it still stand.
+
+Mode 10h (640x350 in 16 colours) used as an 80x25 grid of 8x14
+characters, the glyphs written straight into video memory rather than
+through the BIOS.  tests/guest/bgrid.S (BGRID.COM, the "grid" case of
+bios-tests.sh) does that, and every pixel of every picture is checked
+against the grid that was in the guest's memory, read with the BIOS's own
+8x14 font (int 10h AX=1130h BH=02h).  The build was the current one:
+tiny386-korvo dd34a04f, and the BIOS of the update of 2026-10-19.  Under
+qemu-riscv32-static, not on the board.
+
+All of it works, on the 800x480 screen and again on one of 800x600 (the
+fake console's FAKE_GEOMETRY): 58 results, none wrong.  bios-tests.sh as a
+whole now gives 765 results as they should be, the same 6 known failures,
+and 124 more recorded (tests/bios-results.txt).
+
+   what was done                           what was checked
+   a  the map mask, a plane at a time      every pixel of the 80x25 grid;
+   b  write mode 0, set/reset, bit mask    other characters and colours
+   c  write mode 2, bit mask               each time, so that each way has
+   d  write mode 3, set/reset, a rotate    to replace all of the picture
+      of 3                                 before it
+   up a row by write mode 1 (the latches,  every pixel, the new last row
+   four planes a byte), the last row       blue
+   cleared with set/reset
+   read mode 0, each of the four planes    every byte of the 2000 cells
+   read mode 1 (colour compare) with the   every byte: the glyph, its
+   foreground, the background, and no      inverse, and 0FFh
+   plane compared
+   the BIOS: AH=02h and 09h a cell at a    every pixel
+   time (the foreground on black), and
+   AH=06h up a row, to compare with
+
+Every cell has its own foreground and background colour and both are drawn;
+the characters run through all 256, the box and shade characters among
+them.
+
+Where it sits: tiny386 does not scale, and puts the 640x350 in the middle of
+the screen: at (80,65) on 800x480, and at (80,125) on 800x600, which is 80
+pixels in from each side and 125 from the top and from the bottom.  Both
+were checked, every pixel.
+
+What it costs, counted on the board's code: tests/perf.sh grid, the same
+trace of qemu-riscv32-static that BENCH's pieces are counted with, gives
+tests/grid-rv32.txt.  The ms are the usual guess (16 ns an instruction, 135
+ns a store), not a measurement:
+
+                                     guest        host        stores        ms
+                                    instr.       instr.
+   a whole screen, 2000 cells
+   d  write mode 3, a rotate        541,464     80,299,202     9,391,042    2,553
+   c  write mode 2                  619,402     87,616,927    10,715,477    2,848
+   b  write mode 0, set/reset       668,626     91,514,910    11,163,031    2,971
+   a  the map mask, plane by     1,451,772    161,516,293    21,521,478    5,490
+      plane
+   the BIOS, AH=02h and 09h     17,813,008  2,337,041,248   327,491,199   81,604
+   a row up
+   write mode 1, and the clear       41,023      4,770,283       697,460      170
+   the BIOS, AH=06h                  18,675     17,755,556       587,905      363
+   showing it (the picture of mode 10h on the 800x480 screen)
+   the first after a mode change                 3,074,146       430,452      107
+   everything drawn again                        2,623,627        28,423       46
+   nothing has changed                             271,052           426        4
+
+So under emulation write mode 3 with a rotate is the cheapest way to fill
+the screen, with write mode 2 and write mode 0 with set/reset close behind
+(within 17 in 100 of it: the three are about the same number of guest
+instructions, and how a program writes its loop matters as much).  A plane
+at a time costs about twice as much, since it goes over the screen four
+times.  The BIOS's AH=09h costs about thirty times as much as any of them,
+some 8,900 guest instructions a character.  Up a row, write mode 1, which
+copies the four planes together, costs half what the BIOS's AH=06h does.
+The counts include BGRID's own loop round each cell, the same for every way;
+a program written tighter would do better in all of them.  At the guessed
+speed a whole screen takes seconds whichever way, about 1.3 ms a cell by
+write mode 3: a program that writes only the cells that change pays for
+those alone, and tiny386 then redraws only the 8-pixel groups that changed
+(a still screen, 4 ms a picture).
+
+Nothing failed, so nothing is added to the follow-ups or to
+tests/bios-expected.txt.
+
+Update, 2026-10-19: the BIOS built here, and fixed
+===================================================
+Read this first.  Where it, the update of 2026-10-18 below it and the rest
+disagree, the newer is right.
+
+bios.bin and vgabios.bin are now built here from source, by
+tools/build-bios.sh: SeaBIOS 81ec9ec0 with tiny386's seabios/patch and
+seabios/config (patches/seabios-tiny386.*, unchanged), then
+patches/seabios-korvo.patch.  The same script without that last patch
+gives the two files of tiny386's release, byte for byte; BUILD.txt ("The
+BIOS") has how.  bios-tests.sh now gives 707 results as they should be and
+6 known failures, of which only one (4F0Ah) is the BIOS's, and 124 more
+recorded (tests/bios-results.txt).  Under qemu-riscv32-static, not on the
+board.
+
+Fixed in the BIOS, and passing now:
+* mode 07h: 720x400, every cell, and mode 03h's palette registers right
+  after it.  The mode set now writes the misc output before the CRT
+  controller, and the attribute flip-flop is reset at 3BAh while the misc
+  output says monochrome, at 3DAh otherwise;
+* 350 scan lines (12h BL=30h AL=01h): mode 03h is 640x350 in 8x14, 01h
+  the same with each dot twice, 07h 720x350 in 9x14, every cell read back;
+  8x8 then gives 43 lines, 640x350, every cell.  It was accepted and not
+  used;
+* cursor emulation (01h): 0607h is lines 13 and 14 of 16;
+* 12h BL=31h: no palette on a mode set when asked.  It set bit 3 of the
+  wrong byte of the BIOS data area (0040:0087h for 0040:0089h);
+* 12h BL=33h: 1010h stores the grey while summing is on;
+* 12h BL=36h: SR01h bit 5 is set and cleared (the picture is tiny386's,
+  below);
+* 1Bh: rows, colours, pages and scan lines as the mode has them, in modes
+  03h, 12h and 13h;
+* 0Ch and 0Dh: the page (BH) in mode 0Dh;
+* 13h AH=18h on the floppies: 79 cylinders of 18 sectors on the 1.44M
+  image, of 9 on the 720K one, accepted.
+
+Three of the checks were wrong, and are changed:
+* bioscheck.py wanted 350-line text in mode 03h, and 43-line text, 9 dots
+  wide (720x350).  IBM's VGA sets those as the EGA had them, 8 dots wide
+  (640x350); in 350 lines only mode 07h is 9 wide.  IBM's mode table and
+  Ralf Brown's list agree on that.
+* bpal.S held the red of a DAC register, in DX, against 0102h, as if
+  green came back in DL.  1015h gives red in DH and green and blue in CX,
+  and leaves DL alone, so 10.12.31.kept-rg could not pass.  The three
+  checks of that kind now look at DH only (kept-r, disabled-r, loaded-r).
+Two pictures were added: the 350-line modes 07h and 01h, which the patch
+sets and nothing looked at.
+
+Left:
+* 10.12.36.refresh-off.black, now tiny386's: vga_refresh() in vga.c
+  blanks the picture for the attribute controller's PAS bit but not for
+  SR01h bit 5.  One more condition there would do it (follow-up 10
+  below); it is in patches/tiny386-korvo.patch, which this work left
+  alone.
+* 10.4f.0a.ax (BIOS): no VBE protected mode interface.  SeaVGABIOS has
+  none for any card, and writing one is not small.
+* the floppy port's two faults (emulink).  Neither is a small fix in
+  tiny386's seabios/patch:
+  - past the track: emulink tells the BIOS that every drive is a 1.44M
+    one whatever the image (misc.c, command 100h), and tiny386's patch
+    took out the BIOS's check of the sector against the track for floppies
+    (its commit 17f7e0c, "fix fake floppy"), most likely so that 2.88M
+    images, 36 sectors a track, can be read.  Putting the check back would
+    break those.  The fix belongs in misc.c: refuse a sector, head or
+    cylinder past the image's own geometry, and give the image's drive
+    type;
+  - format: emulink has no command for it.  That needs one in misc.c and
+    in the patch.
+
+The VGA BIOS is 1 KB larger (40,448 bytes); tiny386 loads it at C0000h and
+has no limit there.  Built with the system's gcc 12.2 instead
+(TOOLCHAIN=host), the files are other bytes and give the same results:
+707 and the same 6.
+
+The text below is as it was, but for the table, whose rows say "(fixed
+2026-10-19)" where this changed them.
+
+Update, 2026-10-18: the tiny386 side fixed
+==========================================
+Where this and what follows disagree, this is right (but see the update
+of 2026-10-19 above).
+
+Every fault below that was tiny386's own is fixed in vga.c and pc.c
+(patches/tiny386-korvo.patch), but for mode 07h, which turned out to be the
+BIOS's (below).  bios-tests.sh then gives 670 results as they should be,
+with 33 known failures left, all of them the BIOS's or emulink's
+(tests/bios-results.txt).  Under qemu-riscv32-static, not on the board.
+
+Two of the checker's own expectations were wrong and are changed in
+bioscheck.py: the split screen's model took the rightmost bar for the
+border (both are colour 15) and so called a right picture wrong; and the
+28-row text is allowed to fill the 400 lines (see below).
+
+Fixed, and passing now:
+* split screen (the line compare) in mode X, and the panning dropped below
+  it when AR10h bit 5 asks.  In a mode that draws each row twice the split
+  falls on the start of a row: line compare 240 starts video memory at scan
+  line 240, as the checker has always expected;
+* horizontal pel panning (AR13h), mode 12h moved 3 pixels;
+* the preset row scan (CR08h), text 5 lines up;
+* mode 0Dh at its full width, 640x400;
+* 40-column text (modes 00h and 01h) two pixels to a dot, 720 wide, and the
+  screen cleared when a text picture changes size or place;
+* 28-line text where a VGA has it, rows from the top.  The checker wanted
+  the 8 lines under the 28 rows black; a VGA scans to the vertical display
+  end, which SeaVGABIOS leaves at 400 lines, so it shows the top 8 lines of
+  a 29th row from video memory there, and so does tiny386 now.  The checker
+  was changed to allow that;
+* blinking characters (AR10h bit 3) and the eight backgrounds with them;
+* a block cursor all the way down (lines 0 to 15);
+* the PEL mask (3C6h), kept, read back and used;
+* video memory shut off to the CPU while misc output bit 1 is clear;
+* 4F08h no longer clears video memory: VBE clears it only when it is turned
+  on, as QEMU does.
+
+Mode 07h is the BIOS's: a log of every port access the VGA turned away
+(~/tiny386-scratch/scripts/mono-check.sh in WSL) shows SeaVGABIOS writing all 25 CRT
+controller registers to 3B4h/3B5h while the misc output still says colour
+(67h), and only then setting it to monochrome (66h).  A VGA does not answer
+3B4h until then either, so the registers keep mode 03h's values.  After the
+mode set it resets the attribute flip-flop by reading 3DAh, which a VGA in
+monochrome does not answer, and the next mode set fills the palette
+registers askew.  pc.c now passes 3B4h, 3B5h and 3BAh to the VGA, which a
+correct BIOS would need, but this BIOS still gets a black screen.
+
+The text below is as it was written before the fixes.
+
+What was looked at
+==================
+The BIOS that tiny386 ships, as it is in this folder: bios.bin, SeaBIOS
+rel-1.17.0-20-g81ec9ec0 with tiny386's seabios/patch and seabios/config, and
+vgabios.bin, SeaVGABIOS from the same tree built for the Bochs VBE interface
+(BUILD.txt, "Sources").  It runs on the PC that tiny386 9ed786b emulates,
+with patches/tiny386-korvo.patch: the board's binary, tiny386-korvo, under
+qemu-riscv32-static.  Pictures were read off the fake frame buffer that
+tests/run-tests.sh uses (800x480, RGB565), and disk images were compared
+before and after.
+
+Nothing here ran on the board.  The ESP-IDF build assessed in
+../tiny386-idf/FEASIBILITY.txt has the same BIOS files and the same emulated
+hardware, so what is said here about the BIOS, the ports and the disks
+should hold there too.  Its pictures come from the same vga.c, but it may
+build it with other options for its panel, and that build was not run, so
+what is said here about pictures holds there only as far as those options
+leave vga.c alone.
+
+What "right" means: what an IBM VGA and an AT-class BIOS do, as their
+documentation has it, placed on the screen the way tiny386 places a picture
+(in the middle of the 800x480, not scaled).  I had no VGA card to hold it
+against.  Where I was not sure what a VGA does, the result is recorded
+("for the record" below) and not judged.
+
+How
+===
+tests/bios-tests.sh boots FreeDOS from a copy of freedos-hd.img for each of
+eleven DOS programs (tests/guest/b*.S, assembled with GNU as) and runs it from
+FDAUTO.BAT.  Each program calls the BIOS and says what came back on the
+BIOS's debug port, 0x402, which the board's build writes to its -log file.
+It ends by putting 0xAF in 0000:04F0, which ends the emulator (-marks).
+Programs that draw run against the fake console; at each picture the harness
+waits for the screen to settle, takes it, checks it with tests/bioscheck.py
+and presses a key.  bioscheck.py works out each picture itself: where it
+should be, which colour every pixel should have, and for text, which
+character every cell should show, read with the BIOS's own fonts (which
+BFONTS.COM fetches through int 10h AX=1130h) against what video memory
+held.
+
+   bash tests/bios-tests.sh            all of it, about four minutes
+   bash tests/bios-tests.sh vbe disk   some of it
+
+Every result is held against tests/bios-expected.txt: what works has to
+pass, and what is known not to work has to fail, with the reason beside it.
+A known failure that starts to pass fails the run, so the list cannot go
+stale quietly.  tests/bios-results.txt is the last run: 706 results judged,
+650 as they should be and 56 known failures, and 136 more recorded.
+
+Who is at fault is said for every failure, because the fixes are in
+different places:
+   BIOS      SeaBIOS or SeaVGABIOS answers wrongly, or not at all
+   tiny386   the BIOS does the right thing to the hardware, and the emulated
+             hardware, or the way vga.c draws it, does not follow
+   emulink   tiny386's floppy port (misc.c) and the driver for it in
+             tiny386's SeaBIOS patch
+
+What matters for DOS development
+================================
+In order, the gaps a DOS programmer or a DOS game would run into first:
+
+1. No split screen, no smooth horizontal scrolling, no smooth text scrolling
+   (tiny386).  The line compare register (CR18h), the attribute
+   controller's pel panning (AR13h) and the preset row scan (CR08h) are kept
+   but not drawn: vga.c has the line compare commented out and never reads
+   the other two.  Games that scroll smoothly or keep a status bar with the
+   line compare get the scrolling in steps of whole bytes of video memory
+   (8 pixels in the 16-colour modes) and the status bar not at all.  Mode X
+   itself, page flipping included, is fine.
+2. Mode 0Dh, 320x200 in 16 colours, shows the left half of its picture,
+   each pixel doubled, 320 pixels wide (tiny386).  vga.c halves the dot
+   clock (SR01h bit 3) for this mode but doubles the width only for the CGA
+   modes ("XXX" in vga_graphic_refresh).  It is the 16-colour mode that
+   games of the EGA years mostly used.
+3. No blinking, and attribute bit 7 always gives a bright background
+   (tiny386).  Text-mode programs that use the default (blinking) get
+   bright backgrounds where they meant blinking characters.
+4. Mode 07h, monochrome text, is a black screen (tiny386).  pc.c sends no
+   port in 3B0h to 3BFh to the VGA, so the BIOS's CRT controller writes for
+   the mode go nowhere ("outw ... => 0x3b4" in the log, 28 of them).  And
+   because 3BAh then does not reset the attribute controller's flip-flop,
+   the next mode set fills the palette registers askew (mode 03h after it
+   came out 13 03 02 05 04 07 14 09 ... where it should be 00 01 02 03 ...).
+   Mode 0Fh, also monochrome, does not use those ports here and works.
+5. 40-column text (modes 00h, 01h) is drawn 360 pixels wide in the middle,
+   a pixel a dot, where a VGA doubles each dot to 720; and the 80-column
+   screen before it is left either side (tiny386: vga_text_refresh ignores
+   the halved dot clock, and a screen is cleared only when the mode changes
+   between text and graphics).
+6. VBE: 640x480 in 256 colours needs more video memory than the 256K that
+   conf/freedos.ini gives.  With 256K SeaVGABIOS offers 640x400x8 (100h) and
+   six others, but not 101h; with 1M it offers 15 VBE modes up to 800x600,
+   and every one of them that was drawn here was right, banked and linear.
+   4F08h (the DAC's width) clears video memory (tiny386: vbe_write clears
+   the screen at every write to the enable register, not only when VBE is
+   turned on, as QEMU, which this code comes from, does).  4F0Ah, the protected mode interface, is not
+   there (BIOS).  800x600 works in all three forms offered (103h, 256
+   colours through the window; 114h, 16 bits a pixel, linear; 102h, 16
+   colours in planes): set, drawn, and right in every pixel that the 800x480
+   screen here shows, which is the top 480 lines; the other 120 were seen by
+   moving the display start down.  For a board with 800x600 output nothing
+   in the BIOS stands in the way.  The VBE mode list ends at the screen's
+   width: tiny386 gives the screen's size as the largest the card can do.
+7. 43-line text cannot be had (BIOS): 350 scan lines (12h BL=30h) are
+   accepted and then ignored by the mode set, so 8x8 gives 50 lines.  50
+   lines work.
+8. Floppies work for everything DOS does, but not the way a floppy
+   controller would fail (emulink): a sector past the end of a track reads
+   the next track's first one instead of failing, formatting a track writes
+   nothing, a buffer over a 64K boundary is read without the DMA error (09h)
+   a PC gives, and the drive is a 1.44M drive whatever the image.  Copy
+   protection and disk utilities that probe would be fooled; DOS is not.
+9. Smaller things: a block cursor shows its top 8 lines (tiny386); the
+   PEL mask (3C6h) is not there (tiny386); 1Bh gets four fields wrong
+   (BIOS); 12h BL=31h, 33h and 36h are accepted and do not do all they
+   should (BIOS); 0Ch and 0Dh ignore the page in mode 0Dh (BIOS).
+
+What works and matters: every other standard mode from 00h to 13h, drawn
+right in every pixel and colour; text in 25 and 50 lines and in 8x14; the
+cursor, pages, scrolling, writing characters and strings, teletype, in text
+and graphics modes; the palette and the DAC through the BIOS and through the
+ports, in and out of the vertical retrace; fonts of the user's own and two
+fonts of 256 at once; mode X with page flipping and latch copies; VBE banked
+and linear frame buffer drawing; and int 13h on hard disks, with the
+extensions, LBA and cylinders past 255.
+
+The table
+=========
+works      as a VGA or an AT BIOS does it, as far as was checked
+wrong      it answers, but not as it should (what differs is said)
+missing    it is not there
+recorded   it answers; what it said is kept, and not judged
+
+int 10h
+-------
+00h set mode
+  00h 01h 40x25 text      works     (fixed 2026-10-18) 720 wide, each dot
+                                    twice; was 360 pixels wide with the
+                                    screen before left beside it
+  02h 03h 80x25 text      works     720x400; all 2000 cells read back, in
+                                    their colours
+  04h 05h 320x200x4       works     640x400.  Both have light cyan, light
+                                    magenta and white (05h's colours are
+                                    recorded: I do not know which a VGA has)
+  06h 640x200x2           works     640x400
+  07h mono text           works     (fixed 2026-10-19, in the BIOS) 720x400,
+                                    all 2000 cells, and mode 03h's palette
+                                    registers right after it.  It was a
+                                    black screen: the BIOS wrote the CRT
+                                    controller at 3B4h before it switched
+                                    the misc output to monochrome, and
+                                    read 3DAh after
+  08h to 0Ch              works     refused, the mode as it was, as on a VGA
+  0Dh 320x200x16          works     (fixed 2026-10-18) 640x400; was the
+                                    left half, doubled, 320 wide
+  0Eh 640x200x16          works     640x400
+  0Fh 640x350 mono        works     where and what pattern; the colours are
+                                    recorded (1 and 5 the same grey)
+  10h 640x350x16          works
+  11h 640x480x2           works
+  12h 640x480x16          works
+  13h 320x200x256         works     640x400; the first 32 colours checked
+  83h (bit 7 set)         works     video memory kept; 0Fh says 83h
+  BIOS data area          works     mode, columns, rows, character height,
+                                    in every mode
+01h cursor shape          works     (fixed 2026-10-19, in the BIOS) 0607h is
+                                    lines 13-14, as on a VGA and as the mode
+                                    set leaves it (was 14-15); 000Fh and
+                                    hiding (2000h) are right in the CRT
+                                    controller.
+                                    A block cursor (0-15) shows all 16
+                                    lines (fixed 2026-10-18; was 0-7).  It
+                                    blinks
+02h 03h cursor position   works     two pages; only the page shown moves
+                                    the CRT controller's cursor
+05h active page           works     page 1 shown (start address 0800h), read
+                                    back off the screen, and back
+06h 07h scroll            works     text: windows, clearing, the whole
+                                    screen.  Graphics, modes 12h and 13h: a
+                                    window up and down, read back pixel by
+                                    pixel through 0Dh
+08h read character        works     text, both pages; graphics, modes 12h,
+                                    13h and 04h
+09h 0Ah write character   works     text; 09h in modes 12h, 13h and 04h too,
+                                    with XOR in 12h, and int 1Fh's
+                                    characters from 80h in 04h
+0Bh CGA palette           works     palettes 0 and 1, the background, mode 04h
+0Ch 0Dh pixels            works     every graphics mode of a VGA (04h 05h 06h
+                                    0Dh 0Eh 0Fh 10h 11h 12h 13h), XOR in all
+                                    but 13h; pictures of 12h and 13h.
+                          works     (fixed 2026-10-19, in the BIOS) the page
+                                    (BH) in 0Dh: page 1 written and read,
+                                    page 0 untouched (was ignored)
+0Eh teletype              works     backspace, CR, LF, bell, the end of a
+                                    line, the bottom of the screen (the new
+                                    line has the attribute of the cell at
+                                    the start of the last line, as IBM's
+                                    BIOS does); the page shown is written
+                                    whatever BH says, as IBM's BIOS does it;
+                                    colour in mode 12h
+0Fh mode                  works     in every mode
+10h palette
+  00h 01h 02h 07h 08h 09h works     read back, and the picture's colours
+  03h blink/intensity     works     BIOS: AR10h bit 3 as asked.
+                          works     (fixed 2026-10-18) bit 7 blinks, at half
+                                    the cursor's rate, over eight
+                                    backgrounds
+  10h 12h 15h 17h DAC     works     read back, and the picture's colours
+  13h 1Ah colour page     works     16 pages of 16, page 2: AR10h, AR14h,
+                                    read back, and the picture's colours
+  18h 19h PEL mask        works     (fixed 2026-10-18) kept, read back, used
+  1Bh sum to grey         works     within 1 of 30R+59G+11B
+11h character generator
+  00h user font           works     a glyph of the user's own, in plane 2 and
+                                    on the screen
+  01h 02h 04h ROM fonts   works     8x14, 8x8, 8x16 in plane 2, as 1130h has
+                                    them
+  03h block specifier     works     two fonts of 256 at once (attribute bit 3
+                                    picks), on the screen
+  12h 8x8, 50 lines       works     every cell read back
+  11h 8x14, 28 lines      works     (fixed 2026-10-18) rows from the top of
+                                    the 400 lines, and under them the top
+                                    8 lines of a 29th, as a VGA shows them
+  14h 8x16                works     25 lines again
+  12h after 350 lines     works     (fixed 2026-10-19, in the BIOS) 43 lines,
+                                    640x350, every cell read back (was 50)
+  22h 23h 24h graphics    works     int 43h, rows and height in the BIOS data
+                                    area; text drawn with each, mode 12h
+  30h font information    works     all eight pointers; height and rows
+12h alternate select
+  BL=10h EGA information  works     colour, 256K
+  BL=30h scan lines       works     (fixed 2026-10-19, in the BIOS) 400; and
+                                    350: modes 03h (640x350, 8x14), 01h
+                                    (640x350, each dot twice) and 07h
+                                    (720x350, 9x14), every cell read back.
+                                    It was accepted and not used.  200 not
+                                    tried (SeaVGABIOS gives 400 for it)
+  BL=31h palette loading  works     (fixed 2026-10-19, in the BIOS) off, and
+                                    a mode set keeps the DAC; on, and it
+                                    loads it (was loaded either way)
+  BL=32h video addressing works     (fixed 2026-10-18) bit 1 of the misc
+                                    output off (67h to 65h) and video
+                                    memory is not written
+  BL=33h summing to grey  works     (fixed 2026-10-19, in the BIOS) 1010h
+                                    stores the grey while it is on, the
+                                    colour once it is off (was the colour)
+  BL=34h cursor emulation works     off: 0607h is taken as it is
+  BL=36h refresh          wrong     tiny386: SR01h bit 5 is set and cleared
+                                    (fixed 2026-10-19 in the BIOS, which
+                                    left it alone), but vga.c draws the
+                                    picture all the same
+13h write string          works     AL 0 to 3; the cursor moved or not
+1Ah display combination   works     08h, none other
+1Bh state information     works     (fixed 2026-10-19, in the BIOS) every
+                                    field looked at, in modes 03h, 12h and
+                                    13h.  The rows were one short (24 for
+                                    25), and mode 12h had 8 pages and 400
+                                    scan lines, mode 13h 8 pages and 16
+                                    colours
+1Ch save/restore state    works     size (14 blocks for all three), save,
+                                    change, restore: cursor, DAC, palette
+                                    registers back
+4Fh VBE
+  00h information         works     VBE 3.0, "SeaBIOS VBE(C) 2011"; 256K: 7
+                                    VBE modes, 100h but not 101h; 1M: 15
+                                    VBE modes up to 800x600, nothing wider
+                                    than 800 (105h refused)
+  01h mode information    works     for every mode in the list
+  02h set mode            works     101h banked and linear, 111h linear,
+                                    drawn and checked pixel by pixel; and
+                                    800x600: 103h banked, 114h linear, 102h
+                                    in planes, the top 480 lines on this
+                                    screen, the rest by moving the display
+                                    start (103h)
+  03h current mode        works
+  04h save/restore        works     mode 101h back after mode 03h
+  05h window              works     set and read back; drawing through it
+  06h logical line        works     read, and 1024 pixels set and drawn in
+  07h display start       works     a line down in 101h, 120 lines down in
+                                    103h: the picture moves
+  08h DAC width           works     8 bits, back to 6, and the picture kept
+                                    (fixed 2026-10-18; it was cleared)
+  09h palette             works     16 colours in 8 bits, read back and on
+                                    the screen
+  0Ah protected mode      missing   BIOS: answers 0100h
+other int 10h             not tried 04h (light pen), 11h AL=10h, 20h, 21h,
+                                    12h BL=20h and 35h, VBE 10h and 15h
+
+the VGA's registers (no BIOS)
+-----------------------------
+mode X                    works     unchained, 320x240 by the CRT
+                                    controller; drawn and read back plane
+                                    by plane; a second page shown by the
+                                    start address; a line copied four
+                                    planes at once with write mode 1
+split screen (CR18h)      works     (fixed 2026-10-18) mode X, at 240
+pel panning (AR13h)       works     (fixed 2026-10-18) mode 12h, 3 pixels
+preset row scan (CR08h)   works     (fixed 2026-10-18) text, 5 lines
+vertical retrace (3DAh)   works     bit 3 55 times a second here (60 in
+                                    tiny386's clock), bit 0 twice that; the
+                                    DAC written in the retrace seven times,
+                                    read back, and on the screen
+mode 10h as 80x25 text    works     (2026-10-20, see the update at the
+                                    top) glyphs of 8x14 written by the map
+                                    mask a plane at a time, by write mode 0
+                                    with set/reset, by write mode 2 and by
+                                    write mode 3 with a rotate, every pixel;
+                                    up a row by write mode 1; read mode 0
+                                    by plane and read mode 1 (colour
+                                    compare) on all of it; at (80,65) on
+                                    800x480 and (80,125) on 800x600
+PEL mask (3C6h)           works     (fixed 2026-10-18) see 10h AL=18h
+mono ports (3B0h-3BFh)    works     (fixed 2026-10-18) 3B4h, 3B5h, 3BAh
+                                    reach the VGA; mode 07h works with the
+                                    BIOS fixed (2026-10-19)
+
+int 13h, hard disk (drive 81h, 300 cylinders, 16 heads, 63 sectors)
+----------------------------------------------------------------------
+00h 0Dh 09h 0Ch 10h 11h   works     no error
+01h status                works     0 after a success, 01h after an error
+02h read                  works     over the end of a track, of a cylinder,
+                                    from cylinder 255 into 256 (the top bits
+                                    in CL), the last sector, 127 at once;
+                                    sector 0 and cylinder 300 refused
+03h write                 works     over the end of a track, cylinder 256;
+                                    read back, and in the image only the
+                                    sectors written changed, to what was
+                                    written
+04h verify                works
+08h parameters            works     63 sectors, 16 heads, 2 disks; last
+                                    cylinder 298, one kept back as many
+                                    BIOSes do
+15h type                  works     a hard disk, 301,392 sectors (299
+                                    cylinders)
+41h extensions present    works     EDD 3.0, all three interfaces (CX=7)
+42h 43h 44h 47h           works     LBA read, write (AL 0 and 1), verify,
+                                    seek; over cylinder 255; past the end
+                                    refused; read back by C/H/S
+48h parameters            works     300/16/63, 302,400 sectors, 512 bytes;
+                                    the EDD 2.0 table pointer is given
+45h 46h 49h 4Eh           recorded  45h (lock) succeeds, 46h (eject) says
+                                    B2h, 49h says no change, 4Eh says 01h
+14h diagnostic            recorded  AH=00h
+the vector                recorded  F000:E3FE: FreeDOS left int 13h alone,
+                                    so these are the BIOS's own answers
+
+int 13h, floppy (A:, images of 1.44M and of 720K, each run once)
+------------------------------------------------------------------
+the equipment word        works     one floppy drive
+08h parameters            works     BL=4, last cylinder 79, 18 sectors, 2
+                                    heads, 1 drive, the table; for the 720K
+                                    image too, the drive being a 1.44M one
+                                    whatever the image (emulink says so)
+15h type                  works     01h: a floppy with no change line
+16h change line           works     "changed" (06h, carry set): DOS reads the
+                                    disk again
+00h 01h                   works
+02h read                  works     over the end of a track, a whole
+                                    cylinder, the last sector; over the end
+                                    of a cylinder too, which a floppy
+                                    controller does not do in one go
+                          wrong     emulink: a sector past the end of the
+                                    track (19 on a 1.44M disk) reads the
+                                    next track's first sector, where it
+                                    should fail
+                          recorded  into a buffer over a 64K boundary: read,
+                                    no DMA error 09h; past the last cylinder
+                                    refused
+03h write                 works     three sectors, and over the end of a
+                                    track; in the image, only those changed
+04h verify                works
+05h format                wrong     emulink: accepted, writes nothing (no
+                                    F6h); SeaBIOS logs "stub disk_1305"
+18h media type            works     (fixed 2026-10-19, in the BIOS) 79/18 on
+                                    the 1.44M image, 79/9 on the 720K one,
+                                    ES:DI the parameter table (was 01h)
+17h DASD type             recorded  refused with 01h
+drive B:                  works     absent, and refused
+booting                   works     a floppy that is not bootable in A: is
+                                    passed over and C: is booted
+
+Not checked
+===========
+* The board.  Everything here is under qemu-riscv32-static.
+* A real VGA.  Where it says "as a VGA does", that is from documentation.
+* int 10h AH=04h, 11h AL=10h/20h/21h, 12h BL=20h/35h, 200-line selection,
+  VBE 10h and 15h; graphics fonts in modes other than 12h, 13h and 04h.
+* VBE modes not drawn: 100h, 10Dh to 10Fh, 110h, 112h, 113h, 140h, 141h,
+  146h, 6Ah; nothing larger than 800x600 is offered.  An 800x600 screen
+  for anything but BGRID (the fake console can be made that size, and only
+  BGRID was run on one).  VBE mode sets that keep video memory (bit 15); 1Ch
+  across a change of mode.
+* Other disks: images of 360K, 1.2M and 2.88M; drive B:; hdc and hdd; CD-ROM;
+  disks of more than 1024 cylinders (where the BIOS translates) or 8 GB.
+* What the BIOS does when it is busy or interrupted: timing, IRQs, int 08h
+  and the floppy motor, keyboard (int 16h), int 15h, int 1Ah, the PS/2 mouse
+  and int 33h (no driver on the image).
+* VGA features no program here used: the CRTC's double scan and character
+  height in graphics modes beyond what the modes set, the logical functions
+  of GR03h (AND, OR, XOR) in write modes 0 and 2, read mode 1 with a colour
+  don't care other than all or none, the attribute controller's other bits,
+  memory map 3 (B800 in graphics), odd/even in graphics modes.  (Write modes
+  2 and 3 and read mode 1 were used by BGRID, 2026-10-20.)
+
+Follow-ups
+==========
+2026-10-19: 0 and 11 to 15 are done in the BIOS, and of 17 the BIOS's
+part of 18h; the black screen of 10 is still tiny386's to do, and 16 and
+the rest of 17 are left (see the update at the top).
+1 to 9 are done (2026-10-18; see the update at the top), and 5 turned out
+not to be enough for mode 07h, which needs the BIOS fixed.  Of 10, video
+memory with RAM access off is done; a black screen with SR01h bit 5 is not.
+In tiny386 (vga.c and pc.c, under patches/):
+ 1. Split screen: the line compare (CR18h, CR07h bit 4, CR09h bit 6) in
+    vga_graphic_refresh and vga_text_refresh: at that line the address goes
+    back to 0.  Commented out at present.
+ 2. Pel panning (AR13h) and the preset row scan (CR08h): shift the line by
+    so many pixels, start the first text row so many lines down.
+ 3. Mode 0Dh: double the width when the dot clock is halved for
+    shift_control 0 too, as is done now for shift_control 1.
+ 4. 40-column text: honour SR01h bit 3 in vga_text_refresh (each dot twice),
+    and clear the screen when a text picture's size changes.  The same clear
+    fixes the 8 lines left under 28-line text.
+ 5. Ports 3B0h-3BFh into vga_ioport_read and vga_ioport_write in pc.c
+    (vga.c already handles 3B4h, 3B5h and 3BAh): mode 07h, and the
+    flip-flop after it.
+ 6. Blinking: when AR10h bit 3 is set, use 3 bits of background and blink
+    the foreground of characters with bit 7 (the cursor already blinks).
+ 7. The cursor: vga_draw_glyph8/9 step through the font 4 bytes a line;
+    cursor_glyph is 32 bytes in a row, so a cursor of more than 8 lines
+    runs off it.  It wants 4 bytes a line, or a loop of its own.
+ 8. vbe_write: clear video memory only when VBE is turned on, as QEMU does,
+    so that 4F08h keeps the picture.
+ 9. The PEL mask (3C6h): keep it, read it back, and use it in
+    update_palette16/256.
+10. Misc output bit 1 and SR01h bit 5: no writes to video memory while RAM
+    access is off; a black screen while the screen is off.
+In the BIOS (SeaVGABIOS, or tiny386's seabios/patch):
+ 0. Mode 07h: set the misc output before writing the CRT controller, and
+    reset the attribute flip-flop at the CRT controller's own status port
+    (3BAh in monochrome).
+11. 12h BL=30h: make mode sets use 350 scan lines when asked, for 43-line
+    text (SeaVGABIOS has only the 400-line text modes).
+12. 1Bh: rows, pages, scan lines and colours as the mode has them.
+13. 12h BL=31h, 33h and 36h: do what they say (no palette on mode set, grey
+    on load, screen off).
+14. 01h: cursor emulation as IBM's (0607h to 0D0Eh in 16-line text).
+15. 0Ch/0Dh: the page in modes 0Dh to 10h.
+16. 4F0Ah, if a program needs it.
+In emulink (misc.c and seabios/patch):
+17. Refuse a sector, head or cylinder past the image's geometry with error
+    04h (now it reads on through the image); write F6h on a format; report
+    the drive type from the image's size; 17h and 18h.
+In the configuration: 1M of video memory for VBE 640x480 in 256 colours
+(512K would do for that mode alone), if the board can spare it.

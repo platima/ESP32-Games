@@ -1,0 +1,761 @@
+tiny386 for the ESP32-S31-Korvo-1 (esp32-s31-linux be5b725)
+===========================================================
+
+Status
+======
+Added 2026-10-24: it has run on the board since this was written. On 2026-10-21
+tiny386-korvo booted FreeDOS on the panel at 0.358 million guest instructions a
+second, and the board had 5,076 KiB available with everything running. README.md
+has the results. The rest of this file is as it was before that run.
+
+Built with the board's toolchain and tested under qemu-riscv32-static. It has not run
+on the board. No Windows has been started in it, here or anywhere: I had no Windows
+media and was not to fetch any.
+
+What has been seen, all of it under emulation:
+* tiny386 as its author released it builds for the board without a warning once two
+  files that are not for it are left out, and boots FreeDOS to a prompt.
+* The board's binary, tiny386-korvo, boots FreeDOS 1.4 to a prompt from a hard disk
+  image and from FreeDOS's own boot floppy; takes commands; and ends when FreeDOS
+  switches the machine off. On a terminal, and against a fake copy of the panel's
+  console, where the picture was read back off the frame buffer.
+* 26 test cases, 39 deliberately broken copies, and 707 checks of the BIOS and
+  the VGA, listed under "Tests".
+* The BIOS files built from source: tiny386's own byte for byte, and then with
+  the BIOS fixes made here (see "The BIOS").
+* Two builds of each binary from nothing, in different directories, give the same
+  bytes.
+
+What is worked out and not measured: how much memory it needs, and how fast it will
+be. Both are below, with what they rest on, and TEST-PLAN.txt has the commands that
+turn them into measurements. The short of it:
+* Memory: a guest of 4 MB needs 5.3 MB of the board's as the emulator counts it.
+  Whether the board has that free with Wi-Fi up is not known.
+* Speed: 130 to 310 thousand guest instructions a second, by counts of the
+  emulator's own instructions and stores and the two timing figures the Wolfenstein
+  3D port got from the board. That is an IBM PC or a slow AT, running 386 code.
+  FreeDOS is at its prompt in about a minute at that rate. Windows 95 would take
+  tens of minutes to start, which is a guess from other machines, not a count.
+
+What it is
+==========
+tiny386 (https://github.com/hchunhui/tiny386), an x86 PC emulator in C written to
+run Windows 9x on small microcontroller boards, at commit 9ed786b, with one patch and
+a front end of its own for this board. The front end puts the picture on /dev/fb0
+through the frame buffer console driver of SDL 1.2.15, the SDL that the Wolfenstein
+3D port for this board patched and that has run on it. Everything is linked into one
+static binary; nothing has to be installed on the board.
+
+The emulated PC is tiny386's: a 386 or 486 without x87, SeaBIOS, a VGA with the
+Bochs VBE extension, two IDE channels, a PS/2 keyboard and mouse, PIC, PIT, RTC,
+DMA, an NE2000 with nothing behind it, a Sound Blaster 16 and a PC speaker that
+nobody hears (the board has no sound). The Adlib synthesiser is left out of this
+build: it is 140 KB of tables for a sound that goes nowhere.
+
+Files
+=====
+tiny386-korvo                 the emulator: static RV32 musl soft-float, stripped
+tiny386-korvo-ua              the same, leaving unaligned loads and stores to the
+                              processor (see "Unaligned loads and stores")
+bios.bin, vgabios.bin         SeaBIOS and SeaVGABIOS, built here from their source
+                              with tiny386's patch and the fixes in
+                              patches/seabios-korvo.patch (see "The BIOS")
+seabios-korvo-src.tar.xz      the source tree they are built from, patches applied
+freedos-hd.img                16 MiB disk image, FreeDOS 1.4, boots to C:\>
+conf/freedos.ini              FreeDOS from that image, 2M guest
+conf/freedos-floppy.ini       FreeDOS from freedos.org's own boot floppy
+conf/bench.ini                FreeDOS with 4M, for BENCH.COM and -marks
+conf/win95.ini                Windows 95 on the board (not tried)
+conf/win95-pc.ini             installing it on the PC (not tried)
+patches/tiny386-korvo.patch   against tiny386 9ed786b; begins with what it changes
+patches/seabios-tiny386.patch, patches/seabios-tiny386.config
+                              tiny386's patch and configuration for SeaBIOS
+                              (seabios/patch and seabios/config in tiny386
+                              9ed786b), copied unchanged
+patches/seabios-korvo.patch   the BIOS fixes made here, on top of tiny386's patch;
+                              begins with what it changes
+build.sh                      fetches the sources, patches, builds
+toolchain.sh                  builds the board's compiler alone, when the board's
+                              build tree is not there to borrow it from
+tools/build-bios.sh           builds bios.bin, vgabios.bin and the source tarball
+tools/make-freedos-image.sh   how freedos-hd.img was made
+tools/drive.py                types at tiny386's terminal mode and reads its screen
+tests/run-tests.sh            the tests; tests/results.txt and results-ua.txt are
+                              the last runs
+tests/vgatest.c               the quick way of drawing 16-colour modes against the
+                              old one, pixel for pixel
+tests/fbtext.py               reads text off a picture of the VGA's text screen
+tests/guest/                  BENCH.COM, VGA12.COM, VGA12T.COM, VGA13.COM: sources;
+                              VGA0D.COM, for the counts only (not on the image)
+tests/perf.sh, perf-main.c, tracecount.c, perf-report.py
+                              counting what a guest instruction and a picture cost;
+                              "perf.sh grid", what text written straight into mode
+                              10h costs by each way of writing it
+tests/perf-rv32.txt, pictures-rv32.txt, perf-x86.txt, grid-rv32.txt
+                              the counts
+tests/bios-tests.sh, bioscheck.py, bios-expected.txt
+                              how much of the BIOS works for DOS programs (int 10h,
+                              int 13h, the VGA's registers); tests/bios-results.txt
+                              is the last run, BIOS-COVERAGE.txt what it means
+tests/guest/b*.S, bios.inc, draw.inc, disk.inc
+                              the DOS programs of those tests
+BIOS-COVERAGE.txt             the BIOS, function by function, and what is missing
+                              (its update at the top says what was fixed after)
+TEST-PLAN.txt                 what to try on the board, safest steps first
+DISK-IMAGES.txt               a partition for disk images; Windows into an image
+BUILD.txt                     this file
+
+The binaries, the BIOS files, their source tarball and the FreeDOS image are not for
+the games repository: build.sh, tools/build-bios.sh and tools/make-freedos-image.sh
+make them. Sizes and checksums are in SHA256SUMS and at the end of this file.
+
+Running it
+==========
+TEST-PLAN.txt has the steps in a careful order. In short, with the binary, the two
+BIOS files, the image and conf/freedos.ini in a folder tiny386 on the card:
+     cp /mnt/sd/tiny386/tiny386-korvo /root/tiny386
+     chmod +x /root/tiny386
+     cd /mnt/sd/tiny386
+     /root/tiny386 freedos.ini
+File names in an .ini are looked for from the directory the emulator is started in.
+
+Options
+=======
+(none)           the guest's picture on the frame buffer console
+-term            the guest's text screen on the terminal the emulator was started
+                 from, drawn with that terminal's own characters; no SDL, no
+                 graphics modes. For a first look, and for ssh.
+-none            no screen and no keyboard: for timing
+-insns N         stop after N million guest instructions
+-time S          stop after S seconds
+-marks           time a guest that marks its work, from mark to mark, and stop at
+                 its last mark: BENCH.COM on the FreeDOS image (see "Speed")
+-kips N          run no faster than N thousand instructions a second: to see on a
+                 PC what a slow machine is like
+-share P         at most P in 100 of the time goes on drawing the screen (20)
+-fps N           at most N pictures a second (10)
+-plainvga        draw the 16-colour modes pixel by pixel, like the others: slower,
+                 and what to try if such a picture looks wrong
+-log FILE        the emulator's and the BIOS's messages go to FILE. Without it
+                 they are dropped once the emulator has started: in graphics mode
+                 the console would keep them for later, on top of each other.
+-nosync          do not ask for the guest's disk writes to be put on the card
+-force           run even if the machine has less memory than the guest needs
+--hostbench      time this machine's loads and stores, and stop
+--fix-console    put the console back in text mode after a killed run
+
+In the environment:
+TINY386_NOGUARD=1      do not start the console guard
+TINY386_MEMINFO=FILE   read FILE in place of /proc/meminfo: for the tests
+SDL_NOMOUSE=1, SDL_FBCON_NEWVT=1, SDL_FBCON_VTSWITCH=1, SDL_VIDEODRIVER=dummy
+                       as in the Wolfenstein 3D port's notes: they are SDL's
+
+Every run ends with lines such as
+     tiny386: 5003429 instructions in 21.4 s of running: 0.234 million a second
+     tiny386: beside that, 0.3 s for 140 pictures (2.1 ms each, 38.0 at most), ...
+     tiny386: most memory this process had in use: 2904 KiB, of which the guest's 2304
+     tiny386: available memory was 6120 KiB before and is 3310 KiB now, ...
+(the numbers there are made up). "Running" leaves out the time the guest was halted,
+the time spent drawing and the time spent waiting for the card.
+
+Keys
+====
+With the picture on the panel every key goes to the guest but one combination:
+Ctrl+Alt+Backspace ends the emulator. With -term, Ctrl+] does; the function keys F1
+to F5 type a letter there (the Linux console's codes for them are not ones tiny386's
+terminal mode knows), and Ctrl+C goes to the guest. Ctrl+Alt+F1 and the like do not
+switch consoles while the picture is up.
+
+A mouse has to be plugged in before the emulator starts. SDL finds it among
+/dev/input/event0 to event31 and says which on stderr, which is in the -log file.
+
+The picture
+===========
+The VGA draws straight into the frame buffer: 16 bits a pixel, RGB565, which is what
+the panel is. There is no second copy of the screen and no conversion on the way.
+For that the emulator asks SDL for the whole screen, 800x480, whatever [display]
+says: the VGA takes a row to be as long as the picture is wide, and a smaller
+picture, which SDL would centre, has rows as long as the screen's. If [display]
+says something else the emulator says so and uses the screen's size.
+
+Inside those 800x480 the VGA centres what the guest shows and cuts off what does not
+fit. tiny386 does not scale on this path.
+  text, 80x25                  720x400, a border of 40 pixels all round
+  320x200 in 256 colours       640x400 (each pixel twice each way), border 80 and 40
+  640x480 in 16 colours        the full height, 80 black pixels either side
+  640x400, 640x350             centred, like the above
+  800x600 and up               the top left 800x480 of it
+So for Windows: the standard VGA driver, 640x480 in 16 colours, fits the panel's
+height exactly. Screen shots of the first three are what the tests check.
+
+What a picture costs, counted for the board's code (tests/pictures-rv32.txt). The
+milliseconds are the guess that "Speed" below explains, not a measurement:
+
+                                         instructions      stores     ms
+  text, 80x25
+    after a change of mode                  2,584,000     196,000     68
+    everything drawn again                  2,344,000       4,300     38
+    nothing has changed                        37,000         320    0.6
+  320x200 in 256 colours
+    after a change of mode                  4,090,000     440,000    125
+    nothing has changed                     3,603,000          47     58
+  640x480 in 16 colours
+    after a change of mode                  4,126,000     519,000    136
+    everything drawn again                  3,598,000      39,000     63
+    nothing has changed                       371,000         560      6
+  640x480 in 16 colours, as tiny386 draws it (-plainvga)
+    after a change of mode                 12,834,000     481,000    270
+    nothing has changed                    12,306,000         530    197
+  320x200 in 16 colours (mode 0Dh)
+    after a change of mode                  2,545,000     440,000    100
+    everything drawn again                  2,074,000      18,000     36
+    nothing has changed                       185,000       1,700      3
+  320x200 in 16 colours, pixel by pixel (-plainvga)
+    after a change of mode                 10,724,000     423,000    229
+    nothing has changed                    10,254,000         450    164
+
+"After a change of mode" is the screen cleared and the picture drawn on it. Until
+2026-10-19 a text screen was cleared twice then, once for the mode and once because
+the text has a new size or place: 2,824,000 instructions, 388,000 stores, 98 ms. The
+second clear is now left out when nothing has been drawn since the first. The two
+-plainvga parts of the table are why the patch draws the 16-colour modes another
+way. As released, tiny386 works out
+every pixel of the screen at every picture, some 39 instructions each in a 16-colour
+mode: a fifth of a second of this processor to redraw a desktop on which nothing has
+moved, sixty times a second if it could. Its own boards have a second core for that.
+Four things are done about it here:
+* The front end draws when the guest's vertical retrace comes round, but at most ten
+  times a second (-fps), and after a picture that took t it waits four times t
+  before the next, so that drawing gets a fifth of the time at most (-share).
+* A pixel is stored only where the screen does not already show it, with one store
+  of 16 bits. Every store on this board goes out to the PSRAM; a load does not.
+* In the 16-colour modes the four bytes that hold eight pixels in the four planes
+  are one aligned word of video memory. That word is kept for every eight pixels of
+  the picture, and at the next picture eight pixels whose word is what it was are
+  passed over. In mode 0Dh, at half the dot clock, each pixel is two dots wide, so
+  one word is sixteen pixels of the screen. This takes 150 KB while 640x480 is up,
+  62 KB in mode 0Dh. tests/vgatest.c holds it against the old way; see "Tests".
+* tiny386 clears a graphics screen at every write to a register of the CRT
+  controller, and the BIOS makes two such writes for every character it prints: it
+  moves the text cursor, which a graphics mode does not show (counted: VGA12T's
+  forty characters are 82 writes more than VGA12 makes). A clear and the
+  picture drawn on it again is the "after a change of mode" line of the table: 136
+  ms, or 270 as tiny386 draws it, and a black flash, for each character. Here the
+  clear waits for the next picture, and is left out when that picture is where the
+  last one was with black round it, which is when clearing and drawing would leave
+  the same screen. The same test holds this against the old way, and VGA12T shows
+  it.
+-plainvga turns the last two off, and the second text clear left out above: the
+16-colour modes are then drawn, and cleared, as tiny386 does it.
+The 256-colour modes and the VBE modes still have every pixel looked at each time,
+14 instructions each: about 58 ms for 640x400, so three or four pictures a second.
+Mode 0Dh (320x200 in 16 colours, half the dot clock) went that way too until
+2026-10-19, at 164 ms for every picture whether anything had changed or not; the
+quick way takes it now. It has a loop for each dot clock and tells the compiler
+which is the likely one, so that 640x480 costs what it did (500 instructions more a
+picture, counted). Written as one loop for both, a still 640x480 picture cost nearly
+three times as much; as two loops without the hint, 7,000 instructions and 1,400
+stores more.
+
+The picture is written straight into the visible screen, with no second page and
+no waiting for the panel, so a picture that is half drawn can be seen as such.
+
+Memory
+======
+None of this is measured on the board. Under emulation the kernel's view of a
+process cannot be had, so this is from the emulator's system calls (qemu -strace),
+the sizes in the binary, and the sources.
+
+What the emulator takes, for a guest with M of memory and V of video memory:
+
+  the guest's memory        M       all of it at once: the emulator clears it at
+                                    the start, which makes the kernel provide it
+  the guest's video memory  V       likewise
+  the emulator's heap       152 KiB asked of the kernel in a run on the fake console
+                                    (48 KiB of it is the NE2000's buffer)
+  16-colour modes           150 KiB while one is up: the words described above
+  static data               up to 164 KiB, of which SDL's key maps are 128 that the
+                            patched driver mostly does not touch: say 30
+  stack                     a few pages: say 16 KiB
+  code                      575 KiB in the file, read from the card as it is used
+                            and given back by the kernel if memory is short: say
+                            300 KiB in use
+  the console guard         a second process that sleeps: its stack, and what the
+                            kernel keeps for any process: say 50 KiB
+  the frame buffer          none: it is the panel's own 752 KiB, there already
+
+That is M + V + 0.55 MiB in a text mode and M + V + 0.7 MiB in a 16-colour mode, of
+which only M, V and the 152 KiB are counted and the rest is estimate. The emulator
+allows itself 1 MiB when it checks, and prints the real figure (the kernel's VmHWM
+for the process) at the end of every run.
+
+Against the board: 16 MiB of PSRAM, of which Linux has 15,376 KiB. What is free of
+that with the system up is not known; the working guess has been 5 to 7 MiB with
+Wi-Fi running, never measured.
+
+  guest                               needs, as the emulator checks it
+  FreeDOS, 2M + 256K                  3.25 MiB
+  4M + 256K                           5.25 MiB     fits the guess, just
+  6M + 320K  (tiny386's 800x480 board, Windows 95)
+                                      7.3 MiB      does not, without making room
+  7M + 768K  (tiny386's win98.ini)    8.75 MiB     does not
+  7568K + 320K  (tiny386's first board, Windows 95)
+                                      8.7 MiB      does not
+
+The emulator reads MemAvailable from /proc/meminfo before it takes anything and
+stops if the guest and its megabyte are more than that: it would otherwise be
+killed by the kernel in the middle of starting, or, with the 64 MiB swap file, live
+on with part of the guest in the swap file, where one guest instruction can cost a
+read from the card. -force overrides it. MemAvailable does not count what other
+processes could give up to the swap file, so there is some slack beyond it: idle
+daemons swapped out cost nothing, the guest swapped out costs everything.
+
+Making room: TEST-PLAN.txt, step 1, measures what stopping the Wi-Fi (wpa_supplicant,
+wpa_cli, udhcpc), dropbear, crond, klogd and syslogd gives back. I do not know the
+figure; one to three megabytes is my guess. Stopping the Wi-Fi does not unload its
+driver, and its firmware is in the chip's own SRAM, not in the PSRAM.
+
+Windows 95 was sold as needing 4 MB and is not pleasant with less than 8. With 4M
+it will page to its swap file inside the disk image all the time; whether that is
+bearable at this speed is the open question, more than whether it starts.
+
+Speed
+=====
+Counted, not timed. qemu's own speed says nothing about the board, so the emulator's
+work was counted instead: tests/guest/bench.S is a DOS program that does nine fixed
+pieces of work and marks where it is; tests/perf runs it on the board's emulator
+(the objects of tiny386-korvo with another main()) under qemu-riscv32-static, which
+logs every block of instructions it carries out; tests/tracecount counts them between
+the marks. For one guest instruction, on the board's code as built (-O3):
+
+                                         host     loads   stores    thousand
+                                         instr.                     a second
+  16-bit arithmetic in registers          89.7     22.5    13.5       307
+  16-bit loads and stores                168.9     40.6    20.1       185
+  16-bit calls and stack                 119.7     30.4    14.2       261
+  DOS calls (int 21h)                    139.3     35.7    17.3       219
+  32-bit arithmetic, paging on            87.2     22.6    13.5       310
+  32-bit loads and stores, paging on     179.7     45.6    21.4       173
+  32-bit calls and stack, paging on      140.3     36.8    15.5       231
+  a translation cache miss every time    197.1     53.1    27.2       147
+  rep movsw and rep stosw, for each BYTE  18.8      3.8     1.26     2,120
+
+The last column is the guess. The Wolfenstein 3D port timed three frame rates on the
+board and counted instructions and stores for the same three; two of the rates fix
+two figures, 16 ns for an instruction and 135 ns for a store, and the third came out
+within 3 in 100. With those, a guest instruction costs 3 to 7 microseconds here,
+about half of it in stores: the emulator stores 13 to 27 times for every guest
+instruction (the instruction pointer twice for each byte it fetches, five words for
+the flags, the count of instructions, and its own stack).
+
+Two cautions about that column. The two figures were fitted with counts of x86 code
+(valgrind), and x86 stores more than RV32 does for the same C; tests/perf-x86.txt is
+this benchmark counted that way, and comes to 144 to 298 thousand a second, the same
+band. And the figures are from a game; an emulator may sit differently in the
+caches. So: 130 to 310 thousand instructions a second, and I would not be surprised
+by half or double. -marks on the board settles it (TEST-PLAN.txt, step 6): it times
+the same nine pieces.
+
+What that is like: an IBM PC did about 250 thousand instructions a second and an
+8 MHz AT about a million, both of 16-bit code. Held to 250 thousand a second on a PC
+(-kips 250), the emulator has FreeDOS at its prompt 37 seconds after starting, and
+"dir" takes 6 seconds; held to 120 thousand, 73 and 13 seconds. Nothing in the BIOS
+or in FreeDOS minded being that slow. Starting FreeDOS is about nine million
+instructions.
+
+For Windows 95 I have no count. A 386DX-33 does some five million instructions a
+second and takes a minute or two to start it; at a twentieth to a fortieth of that
+rate, with more paging because there is less memory, half an hour is the kind of
+figure to expect, and it is a guess.
+
+Why -O3: tiny386 builds itself with -O3, and the counts agree. The same benchmark
+built -O2 has the three pieces with paging at 207, 172 and 212 instructions and
+27.5, 22.4 and 30.7 stores: a fifth to a third slower by the guess, because at -O2
+the address translation is a function call with its own stack frame. The 16-bit
+pieces are the same either way, and the binary is 24 KB larger. -Os was not better
+anywhere. What -O3 does to the 16 KB instruction cache, counts cannot say.
+
+What was not done: the emulator's inner loop is as released. The stores are in its
+design (two counters for the instruction pointer, the flags kept as five words) and
+taking them out is a rewrite of the loop, not a change that can be shown to be safe
+by looking at it.
+
+Unaligned loads and stores
+==========================
+tiny386 reads and writes guest memory through pointers that are as aligned as the
+guest's addresses, and says so: "only works on hosts that are little-endian and
+support unaligned access". x86 code does not align much. Counted on a PC, while the
+BIOS and FreeDOS start, one guest instruction in eight makes the emulator load or
+store 16 or 32 bits at an address that is not a multiple of that size; in the
+benchmark's pieces with calls, one in thirteen.
+
+Whether the ESP32-S31 does such an access itself I could not find out. The port's
+kernel is configured as if they work and are slow, its firmware is OpenSBI, which
+does them by hand when the processor traps, and nothing in the port's notes says.
+If the processor traps, every one of them is a trip into the firmware, some hundreds
+of instructions, and the emulator would be several times slower than the figures
+above with nothing to show why.
+
+So tiny386-korvo is built with -DI386_ALIGNED_ONLY: a load or a store that is not
+aligned is made of smaller ones that are (unaligned.h). The cost where it was not
+needed is small: the aligned case has one test more. That the build makes no
+unaligned access was checked on a PC with gcc's alignment sanitizer, through
+FreeDOS, the benchmark and the three kinds of picture: no report, where the same
+run of the other build reports all four of its accessors. tiny386-korvo-ua is that
+other build, with the accessors as released. --hostbench times an aligned and an
+unaligned load and store on the machine it is run on and says which build suits.
+
+The console
+===========
+With the picture up, the panel's console is in graphics mode and its keyboard in raw
+mode. What puts them back, and when:
+* Any ordinary end (the guest switches off, Ctrl+Alt+Backspace, -time, -insns,
+  -marks), and any error the emulator stops on: SDL, before the closing lines or
+  the complaint are printed.
+* A signal that ends the emulator (TERM, INT, HUP, SEGV, ABRT and the rest): SDL's
+  frame buffer driver, as patched for the Wolfenstein 3D port, in the signal handler.
+  "killall tiny386" from another login is safe. No closing lines then.
+* The emulator killed outright (kill -9, or the kernel when memory runs out): the
+  console guard, a second process started before anything is changed. It holds one
+  end of a pipe and sleeps until the other end closes, which it does when the
+  emulator is gone however that happened; then it puts back what it finds. It is the
+  same binary started with --console-guard, and the same idea as that port's guard,
+  written again for this program.
+* By hand: /root/tiny386 --fix-console.
+With -term the terminal is in raw mode and on its second screen, which the guard
+also puts right when the terminal is a console; over ssh "reset" does.
+
+The emulator cannot be hung by a guest: it leaves the guest every 4,096
+instructions to look at the clock, the keyboard and the screen. A guest that has
+stopped is still an emulator that listens.
+
+"killall -9 tiny386" kills the guard as well: BusyBox finds processes by the file
+they run, and the guard runs the same file.
+
+Disks
+=====
+A disk is a file: 16 heads, 63 sectors a track, as many cylinders as it is long.
+The emulator hands every write to the kernel as the guest makes it, so an emulator
+that is killed loses nothing of its own; the kernel caches the file in whatever
+memory is free, and a write is on the card only some seconds later. When the guest
+has written and then been quiet for two seconds the emulator asks the kernel to put
+the image's data on the card and waits for it (-nosync turns that off), and it does
+the same when it ends. Floppy images are treated the same way. A board that loses
+power in between loses what was not yet written, and a guest's file system may not
+survive that. Keep a copy of an image that took an evening to make.
+
+A floppy image has to be the size of a floppy that tiny386 knows (360K, 720K, 1.2M,
+1.44M, 2.88M and a few more): the emulator says so before it starts if it is not.
+
+enable_serial = 1 is refused. tiny386's serial port is the emulator's standard
+input, a byte at a time: on this board that is the keyboard, and the guest would
+get every key, the ones that end the emulator among them.
+
+What the patch changes
+======================
+The patch begins with this list, file by file; in short:
+* I386_ALIGNED_ONLY (i386.c, pc.c, vga.c, new unaligned.h).
+* VGA_STORE_CHANGED, the quick way for 16-colour modes (mode 0Dh too), the clear of
+  a graphics screen put off until the next picture, and the second clear of a text
+  screen left out when nothing has been drawn since the first (vga.c, vga.h).
+* PC_STEP_COUNT and PC_DEBUGCON can be set when building (pc.c). The board's build
+  has the emulator leave the guest every 4,096 instructions, not every 10,240, and
+  the BIOS's debug messages go where the emulator's do.
+* ide_write_count() and ide_flush(), emulink_write_count() and emulink_flush(), and
+  every write to an image handed to the kernel at once (ide.c, misc.c). These last
+  are not behind a build flag: a write to a disk image is followed by an fflush(),
+  and two stores into an ATAPI answer are made byte by byte, in every build.
+* Ctrl+] in the terminal mode can be given to the front end (term.c).
+* korvo/main.c, guard.c, hostbench.c: the front end, new.
+* What the VGA does that tiny386 did not, found by the BIOS tests (vga.c, pc.c):
+  the split screen, horizontal panning, the preset row scan, mode 0Dh at its full
+  width, 40-column text, text rows from the top of the picture, blinking, the
+  underline, a tall cursor, the PEL mask, video memory shut off by the misc output
+  register, VBE keeping video memory when only the DAC's width changes, the
+  monochrome CRT controller ports, and the picture's address wrapping at 256 KB as
+  a VGA's does (it read past the end of video memory before). These are for every
+  build. BIOS-COVERAGE.txt has the details.
+Apart from those, nothing changes in a build that does not ask: the other front
+ends, built with their own flags, are as they were. 2,312 lines added, 83 removed,
+16 files.
+
+What turned up in tiny386 itself
+================================
+* "gcc -O3 *.c -o tiny386_headless -lm", as its README has it, does not build on a
+  Linux that is not x86: kvm.c is among the files, and wants x86's KVM. Without it
+  and amd64.c (the 64-bit guest, not wanted here) the rest builds for RV32 with
+  GCC 15.3 and musl without one warning, and boots FreeDOS.
+* The first picture of a text screen after a change of mode is drawn black on black:
+  the colours are worked out one picture later. One frame, on a PC.
+* Its terminal mode prints the BIOS's debug messages into the guest's screen
+  (stdout). The board's build sends them to the log.
+None of these is a fault on its own boards. Found later, by the BIOS tests and a
+review, and fixed in the patch:
+* The VGA lacked the split screen, panning, the preset row scan, blinking and the
+  rest listed under "What the patch changes", and drew mode 0Dh as the left half of
+  its picture.
+* A picture whose start address is near the end of video memory was read on past
+  the end of it, by as much as the rest of the picture: a guest could make the
+  emulator read memory that is not video memory. The address now wraps at 256 KB,
+  as a VGA's does, and pc.c puts 16 KB of slack behind video memory for the end of
+  a line.
+* The text cursor was drawn from a 32-byte glyph read 4 bytes a line, so a cursor
+  taller than 8 lines read past its end.
+* SeaVGABIOS, as tiny386 ships it, sets mode 07h by writing the monochrome CRT
+  controller before it switches the misc output to monochrome, so on a VGA, real
+  or emulated, mode 07h stays black. Fixed in the BIOS built here, with the other
+  faults of the BIOS that the tests found: see "The BIOS".
+
+The BIOS
+========
+bios.bin and vgabios.bin are SeaBIOS and SeaVGABIOS built here: SeaBIOS at 81ec9ec0
+with tiny386's own patch and configuration for it, as tiny386's CI builds them, and
+then patches/seabios-korvo.patch, which fixes what the BIOS tests found wrong in the
+BIOS itself. tools/build-bios.sh does all of it (see "Build").
+
+The files tiny386 released were built again from source first. With the compiler
+its CI used (Ubuntu 26.04's gcc 15.2.0-16ubuntu1 and binutils 2.46, which the files
+name) and the CI's build time and host name in the version string, both came out
+the same bytes as the two in tiny386's release of 2026-10-08; UPSTREAM=1 makes that
+build. With Debian 12's gcc 12.2 they come out different (vgabios.bin 512 bytes
+longer); the exact match made testing those unnecessary.
+
+What the patch fixes; its head says more, and BIOS-COVERAGE.txt has the tests:
+* Mode 07h: the screen was black and the next mode's palette askew. SeaVGABIOS
+  wrote the CRT controller at 3B4h before it switched the misc output to
+  monochrome, and reset the attribute flip-flop at 3DAh, which a VGA does not
+  answer in mode 07h.
+* 350 scan lines (12h BL=30h) were accepted and then ignored. Text modes are now
+  set in 350 lines when asked, as on IBM's VGA (80 columns 640x350, 07h 720x350),
+  and 8x8 then gives 43 lines.
+* Cursor emulation: 0607h is lines 13 and 14 of 16, as on a VGA (it was 14 and 15).
+* 12h BL=31h (no default palette), BL=33h (summing to grey) and BL=36h (screen
+  off) were accepted and did not work; they do.
+* 1Bh gives the mode's rows, colours, pages and scan lines.
+* 0Ch and 0Dh take the page in modes 0Dh to 10h.
+* 13h AH=18h (the media type for a format) works on floppy drives.
+Left as they were: 4F0Ah (VBE's protected mode interface, not a small job), and
+the floppy port's faults, which are tiny386's (BIOS-COVERAGE.txt says why).
+
+The files are not tiny386's bytes, and say so: their version string is
+"rel-1.17.0-20-g81ec9ec0-dirty-20261019_000000-korvo", where the time and the host
+name are fixed by the script so that every build gives the same bytes. vgabios.bin
+is 40,448 bytes, 1 KB more than tiny386's; tiny386 reads it into memory at C0000h
+and sets no limit there.
+
+Sources
+=======
+tiny386          https://github.com/hchunhui/tiny386, branch master,
+                 commit 9ed786b4dd9698306dccdb7595858dee10949994 (2026-10-08)
+SDL 1.2.15       https://www.libsdl.org/release/SDL-1.2.15.tar.gz
+                 sha256 d6d316a793e5e348155f0dd93b979798933fb98aa1edebcc108829d6474aad00
+                 with ../wolf3d/patches/SDL-1.2.15-korvo-fbcon.patch, and configured
+                 as that port configures it
+SeaBIOS          https://github.com/coreboot/seabios, commit
+                 81ec9ec0bcf45df11fb7f98339ec9036b546fca0 (2026-07-31, twenty
+                 commits after release 1.17.0), with patches/seabios-tiny386.patch
+                 and patches/seabios-tiny386.config (seabios/patch and
+                 seabios/config in tiny386 9ed786b, unchanged), then
+                 patches/seabios-korvo.patch: bios.bin and vgabios.bin, built by
+                 tools/build-bios.sh. seabios-korvo-src.tar.xz is that source
+                 tree, patched and configured.
+                 The compiler for it: Ubuntu 26.04's gcc-15 15.2.0-16ubuntu1 and
+                 binutils 2.46-3ubuntu2, packages from archive.ubuntu.com, listed
+                 with their checksums in tools/build-bios.sh.
+                 Until 2026-10-19 the two files here were the ones out of
+                 tiny386.tar.xz from tiny386's releases page, the build of
+                 2026-10-08 (sha256 24652e9421d78fc4548256409dd4be3c382ff13a7b667cabf8123a733b0bbad4).
+                 That page keeps one rolling build; UPSTREAM=1 bash
+                 tools/build-bios.sh builds those two again, byte for byte.
+FreeDOS 1.4      https://download.freedos.org/1.4/FD14-FloppyEdition.zip
+                 sha256 45b1fa7c52dd996c3bfa5e352ffcd410781b952a6ad629f15a4c9ec4bbaefc5a
+                 freedos-hd.img is made from its boot floppy by
+                 tools/make-freedos-image.sh. It is not the same file twice: FORMAT
+                 gives it a serial number and the files the time of day.
+
+Licences
+========
+tiny386 is under the BSD 3-clause licence, with parts from QEMU and TinyEMU under
+the MIT licence; the patch is offered under tiny386's. SDL is LGPL 2.1 or later; its
+patch is the Wolfenstein 3D port's and is offered under the LGPL. musl is MIT, and
+the compiler's libraries have GCC's runtime exception. SeaBIOS is LGPL 3, and so
+are tiny386's patch for it and the one here. FreeDOS's kernel and shell are GPL 2 or
+later, and the other programs on the image have free licences of their own
+(https://www.freedos.org/about/license/). Whoever passes the binary on has to let
+the receiver relink it against another SDL, which build.sh does, and whoever passes
+on the FreeDOS image has to say where its sources are, which is above.
+Whoever passes on bios.bin and vgabios.bin has to pass their source on with them, or
+offer it, with what builds it. That is seabios-korvo-src.tar.xz (the source as it
+was built), the three patches/seabios-* files and tools/build-bios.sh, which builds
+the same bytes again: keep them together with the two BIOS files.
+
+Toolchain
+=========
+The board's own: Buildroot 2026.08, GCC 15.3.0, riscv32-buildroot-linux-musl,
+musl 1.2.6, rv32imac, ilp32 (soft float). tiny386's sources are built -O3 and SDL
+-O2, as the Wolfenstein 3D port builds it.
+
+Until 2026-10-14 the compiler was borrowed from the finished build of the board's
+system in ~/esp32-s31-linux-main. That day "make clean" had been run in both board
+build trees (the shell's history has it), which removes build/ and the compiler with
+it. Nothing was put back into those trees. toolchain.sh copies the tree, with its
+Buildroot submodule, and runs Buildroot's "toolchain" target in the copy: ten minutes
+and 0.9 GB, in ~/tiny386-scratch/toolchain. That it is the same compiler was checked
+the only way that means anything: the Wolfenstein 3D port's build.sh, pointed at it,
+gave wolf3d-korvo with sha256 fbb3ab87...abdb743, which is the binary that ran on the
+board at 35.3 frames a second, byte for byte.
+
+Build (WSL2 Debian)
+===================
+     bash build.sh [WORKDIR]
+     VARIANT=ua bash build.sh [WORKDIR]
+WORKDIR defaults to ~/tiny386-scratch/build and build-ua. It needs curl, git, patch
+and make, and the board's compiler where the top of the script says it looks. It
+fetches SDL's tarball and checks it, clones tiny386 at the commit, applies the two
+patches, builds SDL into WORKDIR/prefix and the emulator against it, and leaves
+WORKDIR/tiny386-korvo. Two minutes.
+
+Each was built twice from nothing, in different directories, and gave the same file
+both times: the checksums at the end.
+
+     bash tools/build-bios.sh [WORKDIR]
+     UPSTREAM=1 bash tools/build-bios.sh [WORKDIR]
+builds bios.bin and vgabios.bin into WORKDIR/out (WORKDIR defaults to
+~/tiny386-scratch/bios-build), with seabios-korvo-src.tar.xz, the source tree as it
+was built. It needs git, patch, make, python3, curl and xz, and for the compiler it
+uses by default dpkg-deb, patchelf and unshare. It fetches the 22 Ubuntu 26.04
+packages of tiny386's CI compiler (47 MB, each checked against the checksum in the
+script), clones SeaBIOS at the commit, applies the patches and builds as tiny386's
+CI does: two or three minutes, most of it the fetching. No root is needed. Ubuntu's
+gcc calls its assembler and linker as /usr/bin/x86_64-linux-gnu-as and -ld, which
+on Debian are Debian's older ones, so the script runs the build in a user and mount
+namespace of its own (unshare) with Ubuntu's mounted over those two paths; nothing
+outside it sees them. SeaBIOS writes the time and the host's name into its version
+string; the script fixes both, so every build gives the same bytes.
+UPSTREAM=1 leaves out seabios-korvo.patch and uses the time and host name that are
+in tiny386's files: that build is the two files of tiny386's release of
+2026-10-08, byte for byte, and the script says so. TOOLCHAIN=host uses the
+system's own gcc instead (Debian 12: gcc 12.2, binutils 2.40): other bytes, and
+the same results in tests/bios-tests.sh.
+Two builds from nothing, in different directories, gave the same three files.
+
+     bash tools/make-freedos-image.sh
+makes the FreeDOS image: it builds the same patched sources for the PC, and has that
+emulator boot FreeDOS's boot floppy and run FDISK, FORMAT and SYS on an empty disk,
+typing at it through tools/drive.py. Then it copies a few of the floppy's programs
+and the four of tests/guest onto the disk with mtools, and boots it.
+
+Tests (under qemu-riscv32-static, not on the board)
+===================================================
+     bash tests/run-tests.sh
+needs the trees that build.sh leaves, the FreeDOS image, the boot floppy that
+make-freedos-image.sh fetched, the fake console of the Wolfenstein 3D port's tests
+(../wolf3d/tests/fakefb.c and fbtool.py), gcc with as and ld, mtools and python3.
+Four minutes. tests/results.txt is the last run for tiny386-korvo and
+tests/results-ua.txt for tiny386-korvo-ua: 26 cases each, all passed.
+
+The board's binary as it is:
+* usage; a BIOS file or a disk image that is not there, a serial port asked for,
+  and a floppy image of no known size are said before anything starts; too little
+  memory is said, with the numbers, and -force goes on
+* -none with -insns, -time and -kips; the BIOS's and the emulator's messages are in
+  the -log file; -marks times BENCH.COM's nine pieces and ends
+* --hostbench runs to its end
+* -term on a pseudo terminal: FreeDOS from the hard disk image to C:\>, ver, mem
+  (2,048K), dir, and "off", which ends the emulator; BENCH with 2M says that it
+  wants 4; Ctrl+] ends it; FreeDOS from freedos.org's boot floppy to A:\>, ver, mem
+  These use conf/freedos.ini and conf/freedos-floppy.ini as they are handed over.
+
+Against the fake console (an 800x480 RGB565 frame buffer with one mode, virtual
+terminals, a keyboard), with SDL's frame buffer driver and this port's guard compiled
+against it unchanged and every other object the one in the board's binary:
+* FreeDOS to its prompt on the screen. The text is read back off the frame buffer by
+  matching every character cell against the VGA's font (tests/fbtext.py): the prompt,
+  and mem's answer after "ver" and "mem" were typed at the fake keyboard as the
+  kernel's key codes. The text screen begins 40 pixels in.
+* A [display] of another size is put right, and said.
+* VGA13: a picture of 640x400 at (80,40). VGA12: fifteen colours, and what is not
+  black is 640x476 from (80,4): the bands under the black one, and the box in it.
+* VGA12T, where the BIOS prints forty characters on that picture and writes to the
+  CRT controller for each: run once as built and once with -plainvga, which draws
+  and clears as tiny386 does. The two screens have to be the same in every pixel,
+  and not the screen of VGA12.
+* Ctrl+Alt+Backspace, the guest switching off, SIGTERM, kill -9 with the guard and
+  without it, --fix-console, and too little memory: after each the console has to be
+  as it was found, by the steps that put it back; nothing may be printed while it is
+  in graphics mode; and with too little memory the console is never touched.
+
+     gcc -O2 -std=gnu11 -I. -DBPP=16 -DVGA_STORE_CHANGED -o vgatest \
+         .../tests/vgatest.c vgafont.c && ./vgatest 6000
+in the patched tree, on a PC: the quick way of drawing the 16-colour modes against
+the old one. vga.c is compiled into the test as it is. Registers, palette and video
+memory are set at random: what the BIOS sets for mode 12h in half of the rounds, for
+mode 0Dh in a quarter and for text in a quarter, then some of it changed (noise in
+the video memory in half of the rounds, a few values over and over in the other
+half, as a desktop is). A picture is drawn, then eleven more after small changes,
+among them writes to the CRT controller's registers through the guest's ports: the
+same value again, the text cursor's, any of them, the size; a split screen moved, or
+the picture panned, which the quick way has to stand back for; the dot clock halved
+or put back, text turned to graphics or back, the screen blanked or shown again. A
+second VGA goes through the same with the quick way off, clearing its screen at
+every such write as tiny386 does and clearing a text screen twice after a change of
+mode, and the two screens have to match in every pixel after every picture, on four
+sizes of screen (one an odd number of pixels wide, which cuts the last pixel of mode
+0Dh in half). In a run of 6,000 rounds that is 72,000 pictures, about 27,000 of them
+drawn the quick way from top to bottom and 11,000 of those at half the dot clock
+(panning and the other modes keep it out of the rest), 37,000 writes to the CRT
+controller, 9,500 pictures with a clear put off and 6,500 of those clears left out,
+20,000 text pictures and 700 second clears of a text screen left out. Three such
+runs with different seeds and one under gcc's address and undefined-behaviour
+sanitizers: no difference, no report. Then 39 broken copies (planes in the wrong
+order, the quick way not standing back for panning, bits in the wrong order, the
+palette not compared, the size or the dot clock not compared, "draw everything"
+ignored, the words not kept, a pixel of mode 0Dh drawn once or past the edge of the
+screen, a clear that does not make the quick way forget, a clear left out when the
+rest of the screen is not black or the picture has moved, a second text clear left
+out after text or something else was drawn, and so on): each one has to fail in
+1,200 rounds, and does. Five of them draw the right picture and only lose the
+saving; the test fails those because it counts what it saw and finds no clear left
+out, no second text clear left out, or no picture drawn the quick way at half the
+dot clock.
+
+The alignment check is described under "Unaligned loads and stores".
+
+Not yet checked on the board
+============================
+Everything. In particular:
+* That the binary starts at all: that the board's kernel and processor take what the
+  emulator and qemu took.
+* How much memory there is, and what the emulator really takes (VmHWM).
+* The speed: every figure in "Speed" and in the table of pictures.
+* Whether the processor does unaligned loads and stores itself.
+* The picture on the real panel: its place, its colours, tearing, how it looks while
+  the guest scrolls.
+* The real keyboard through the real kernel's key codes; the fake one sent what the
+  kernel's source says it sends. The lock keys' lights will not follow.
+* A mouse. SDL's reading of /dev/input/eventN ran on the board in Wolfenstein 3D;
+  the way from there to the guest's PS/2 mouse has not been tried anywhere, since
+  FreeDOS on this image loads no mouse driver.
+* The console guard on the real console, and its race with the shell.
+* What the shortest sleep is on this kernel (it has no high-resolution timers, so
+  10 ms is likely): a halted guest wakes that often. --hostbench times it.
+* Disk images on the card: speed, and what the two-second rule costs.
+* Windows, altogether.
+
+Checksums
+=========
+  587,412 bytes  tiny386-korvo
+     dd34a04fd0eb000f65187e086363d32a1c8ffccdd8615a0f283e30d6868a0a71
+  603,796 bytes  tiny386-korvo-ua
+     c5400aead863e5e195d22038d0a69c4ccce65f1da5745ff1505dbba275399091
+  131,072 bytes  bios.bin
+     be36f0d3bb4026357cfe2dc0c45890ab80666362bb6a1f77b3514c4906996555
+   40,448 bytes  vgabios.bin
+     f658c3b002a4fb09297cb0f5d04245fe718af7589b6f5bbe5da2fe86e337d870
+  468,364 bytes  seabios-korvo-src.tar.xz
+     a1fbac8059405620cf42adbab6c902ee53a16cbd39dfa67350b02fbd49d3a369
+The two binaries are what build.sh gives, each time, and the BIOS files and their
+source tarball what tools/build-bios.sh gives. With UPSTREAM=1 it gives tiny386's
+bios.bin (15386625...a9fb205) and vgabios.bin (2e5d99d7...f08795). freedos-hd.img
+is not the same file twice (see "Sources"); the one here, and the patches, are in
+SHA256SUMS.

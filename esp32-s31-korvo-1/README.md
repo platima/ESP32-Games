@@ -2,12 +2,22 @@
 
 Espressif's ESP32-S31 has an MMU, so it can run real Linux. The games here run on the Korvo-1 dev board under [annoyedmilk's esp32-s31-linux](https://github.com/annoyedmilk/esp32-s31-linux), tested at commit `be5b725` - that's the v0.1.0 release plus a README change.
 
+## What's here
+
+| Folder | What | On the board |
+|--------|------|--------------|
+| [doom/](doom/) | fbDOOM, v1 and v2 | v1 at 18 fps in `-timedemo demo1`; v2 not yet run there |
+| [wolf3d/](wolf3d/) | Wolf4SDL on SDL 1.2 | 35.3 fps in `--timedemo 0`, 29.7 fps filling the panel |
+| [tiny386/](tiny386/) | tiny386, an x86 PC emulator, on the same SDL | FreeDOS at about 0.36 million x86 instructions a second |
+
+Binaries for all three, with their source, are on the [releases page](https://github.com/platima/ESP32-Games/releases).
+
 ## What a game has to work with
 
 | | |
 |---|---|
 | CPU | One RISC-V core for Linux at 320 MHz (RV32IMAC; the device tree also lists Zba, Zbb and Zbs). The other core runs the Wi-Fi firmware. No FPU in use. |
-| RAM | 16 MB of PSRAM inside the chip package. Roughly 10 MB is left once the kernel is up. |
+| RAM | 16 MB of PSRAM inside the chip package. Roughly 10 MB is left once the kernel is up. With Wi-Fi and the usual daemons running, `MemAvailable` read 5,076 KiB, or 5,700 KiB with them stopped (measured for tiny386). |
 | Display | 800x480 LCD, RGB565, as a plain framebuffer at `/dev/fb0`. No vsync. |
 | Input | USB keyboard and mouse. |
 | Audio | None. |
@@ -27,7 +37,7 @@ Memory is the tight one. While the LCD is on, every write goes straight out to t
 ## Things that will bite you
 
 - **One console.** A game takes over the keyboard and the screen. The builds here hand both back on every exit they can catch, but if the kernel kills one outright - which is what it does when memory runs out - the game itself can't. Wolfenstein starts a second small process to put the console back in that case - tested against a fake console, not yet on the board. Doom doesn't have one, so there it's SSH, the UART, or a power cycle.
-- **A store costs about eight sums.** With every store going out to the PSRAM, Wolfenstein's frame rates fit roughly 135 ns a store and 16 ns an instruction. So draw small, enlarge on the way to the screen, and skip what didn't change. The [Wolfenstein notes](wolf3d/README.md) have the working, and [storecost.c](wolf3d/tools/storecost.c) is a small program to time loads and stores directly - not yet run on the board.
+- **A store costs about eight sums.** With every store going out to the PSRAM, Wolfenstein's frame rates fit roughly 135 ns a store and 16 ns an instruction. So draw small, enlarge on the way to the screen, and skip what didn't change. The [Wolfenstein notes](wolf3d/README.md) have the working, and [storecost.c](wolf3d/tools/storecost.c) is a small program to time loads and stores directly - not yet run on the board. tiny386's own `--hostbench` has, and gave 97 ns for a store in cache and 134 ns through 2 MiB.
 - **Hard resets mark the FAT partition dirty.** Nothing is lost, but the kernel warns about it at every boot from then on, and the stock image has no `fsck.fat` to clear it. Fix it on a PC.
 
 ## Building for it

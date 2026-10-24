@@ -1,0 +1,54 @@
+
+TEXT MODE, 80x25 (the screen FreeDOS has started on)
+                                     instructions      loads     stores       ms
+first picture after a mode change         2584063     350394     196341       68
+the one after that                        2361956     350497      21781       41
+told to draw everything                   2343943     350382       4318       38
+nothing has changed                         37265      10668        320        1
+
+"ms" is a guess: 16 ns for each instruction and 135 ns for each store.
+
+MODE 13h, 320x200 in 256 colours, shown as 640x400
+                                     instructions      loads     stores       ms
+first picture after a mode change         4090251     773110     439525      125
+the one after that                        3602684     773094         47       58
+told to draw everything                   3602688     773094         49       58
+nothing has changed                       3602684     773094         47       58
+
+"ms" is a guess: 16 ns for each instruction and 135 ns for each store.
+
+MODE 12h, 640x480 in 16 colours (Windows' standard VGA driver)
+                                     instructions      loads     stores       ms
+first picture after a mode change         4126449     662627     519291      136
+the one after that                         371274      86713        556        6
+told to draw everything                   3597839     662576      38953       63
+nothing has changed                        371274      86713        556        6
+
+"ms" is a guess: 16 ns for each instruction and 135 ns for each store.
+
+MODE 12h again, drawn pixel by pixel as the other modes are (-plainvga)
+                                     instructions      loads     stores       ms
+first picture after a mode change        12834293    1849606     480826      270
+the one after that                       12305888    1849590        526      197
+told to draw everything                  12305892    1849590        528      197
+nothing has changed                      12305888    1849590        526      197
+
+"ms" is a guess: 16 ns for each instruction and 135 ns for each store.
+
+MODE 0Dh, 320x200 in 16 colours (each pixel two dots wide), shown as 640x400
+                                     instructions      loads     stores       ms
+first picture after a mode change         2544723     439460     440174      100
+the one after that                         185403      55914       1676        3
+told to draw everything                   2073728     439377      17673       36
+nothing has changed                        185403      55914       1676        3
+
+"ms" is a guess: 16 ns for each instruction and 135 ns for each store.
+
+MODE 0Dh again, drawn pixel by pixel (-plainvga)
+                                     instructions      loads     stores       ms
+first picture after a mode change        10724166    1540567     422890      229
+the one after that                       10253617    1540551        446      164
+told to draw everything                  10253621    1540551        448      164
+nothing has changed                      10253617    1540551        446      164
+
+"ms" is a guess: 16 ns for each instruction and 135 ns for each store.

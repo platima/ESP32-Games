@@ -1,0 +1,107 @@
+Host work for one guest instruction (RV32, counted from a trace)
+
+piece of work                             guest     host   loads  stores of them  thousand
+                                         instr.   instr.                   stack  a second
+16-bit arithmetic in registers          2097152     89.6    22.5   13.51    2.88       307
+16-bit loads and stores                 1773568    168.9    40.6   20.11    6.45       185
+16-bit calls and stack                  2555904    119.7    30.4   14.24    4.85       261
+rep movsw/stosw, for each BYTE         32768000     18.8     3.8    1.26    0.75      2120
+DOS calls (int 21h)                     5712777    139.2    35.7   17.24    6.11       220
+32-bit arithmetic, paging on            2002944     87.3    22.6   13.53    2.89       310
+32-bit loads and stores, paging on      1769472    179.7    45.6   21.44    7.45       173
+32-bit calls and stack, paging on       2596864    140.2    36.8   15.48    5.78       231
+translation cache miss every time       1028096    196.9    53.1   27.13   11.57       147
+
+"thousand a second" is a guess: 16 ns for each host instruction and 135 ns
+for each store, which is what three frame rates of another program on the
+ESP32-S31-Korvo-1 came to. Nothing here was timed on that board.
+
+-- 16-bit arithmetic in registers: where the host instructions and stores were --
+   cpu_exec1                       76.1 instructions  11.88 stores, for each guest instruction
+   fetch8                           5.2 instructions   1.12 stores, for each guest instruction
+   get_CF.part.0                    4.5 instructions   0.25 stores, for each guest instruction
+   peek8a                           2.0 instructions   0.25 stores, for each guest instruction
+   try_jcc8                         1.6 instructions   0.00 stores, for each guest instruction
+   get_uticks                       0.0 instructions   0.00 stores, for each guest instruction
+   __udivdi3                        0.0 instructions   0.00 stores, for each guest instruction
+   i8257_dma_run                    0.0 instructions   0.00 stores, for each guest instruction
+
+-- 16-bit loads and stores: where the host instructions and stores were --
+   cpu_exec1                       74.9 instructions  10.11 stores, for each guest instruction
+   modsib                          21.3 instructions   2.33 stores, for each guest instruction
+   __GE_helper16                   20.3 instructions   2.22 stores, for each guest instruction
+   __GE_helper8                    11.5 instructions   1.11 stores, for each guest instruction
+   translate.constprop.0           10.0 instructions   1.33 stores, for each guest instruction
+   translate.constprop.1            6.7 instructions   0.89 stores, for each guest instruction
+   load16                           6.0 instructions   0.00 stores, for each guest instruction
+   fetch8                           4.7 instructions   1.00 stores, for each guest instruction
+
+-- 16-bit calls and stack: where the host instructions and stores were --
+   cpu_exec1                       63.9 instructions   8.70 stores, for each guest instruction
+   __GE_helper16                   14.9 instructions   1.69 stores, for each guest instruction
+   translate.constprop.0           13.8 instructions   1.84 stores, for each guest instruction
+   translate.constprop.1            9.2 instructions   1.23 stores, for each guest instruction
+   load16                           8.3 instructions   0.00 stores, for each guest instruction
+   store16                          5.5 instructions   0.31 stores, for each guest instruction
+   fetch16                          2.4 instructions   0.38 stores, for each guest instruction
+   get_CF.part.0                    1.5 instructions   0.08 stores, for each guest instruction
+
+-- rep movsw/stosw, for each BYTE: where the host instructions and stores were --
+   store16                          9.0 instructions   0.50 stores, for each guest instruction
+   cpu_exec1                        5.3 instructions   0.76 stores, for each guest instruction
+   load16                           4.5 instructions   0.00 stores, for each guest instruction
+   translate.constprop.1            0.0 instructions   0.00 stores, for each guest instruction
+   translate.constprop.0            0.0 instructions   0.00 stores, for each guest instruction
+   fetch16                          0.0 instructions   0.00 stores, for each guest instruction
+   modsib                           0.0 instructions   0.00 stores, for each guest instruction
+   __GE_helper16                    0.0 instructions   0.00 stores, for each guest instruction
+
+-- DOS calls (int 21h): where the host instructions and stores were --
+   cpu_exec1                       73.6 instructions  10.01 stores, for each guest instruction
+   translate.constprop.0           10.3 instructions   1.37 stores, for each guest instruction
+   translate.constprop.1            8.9 instructions   1.18 stores, for each guest instruction
+   modsib                           7.6 instructions   0.95 stores, for each guest instruction
+   load16                           5.3 instructions   0.00 stores, for each guest instruction
+   store16                          4.4 instructions   0.25 stores, for each guest instruction
+   __GE_helper16                    4.3 instructions   0.54 stores, for each guest instruction
+   fetch16                          3.9 instructions   0.61 stores, for each guest instruction
+
+-- 32-bit arithmetic, paging on: where the host instructions and stores were --
+   cpu_exec1                       73.6 instructions  11.87 stores, for each guest instruction
+   fetch8                           5.2 instructions   1.12 stores, for each guest instruction
+   get_CF.part.0                    4.5 instructions   0.25 stores, for each guest instruction
+   peek8a                           2.0 instructions   0.25 stores, for each guest instruction
+   try_jcc8                         1.6 instructions   0.00 stores, for each guest instruction
+   __GE_helper32                    0.0 instructions   0.00 stores, for each guest instruction
+   translate.constprop.0            0.0 instructions   0.00 stores, for each guest instruction
+   modsib                           0.0 instructions   0.00 stores, for each guest instruction
+
+-- 32-bit loads and stores, paging on: where the host instructions and stores were --
+   cpu_exec1                       73.3 instructions  10.11 stores, for each guest instruction
+   __GE_helper32                   18.0 instructions   2.44 stores, for each guest instruction
+   translate.constprop.0           17.7 instructions   1.67 stores, for each guest instruction
+   modsib                          17.3 instructions   2.33 stores, for each guest instruction
+   translate.constprop.1           13.1 instructions   1.33 stores, for each guest instruction
+   __GE_helper8                    10.4 instructions   1.22 stores, for each guest instruction
+   load32                           8.0 instructions   0.00 stores, for each guest instruction
+   translate                        7.3 instructions   0.67 stores, for each guest instruction
+
+-- 32-bit calls and stack, paging on: where the host instructions and stores were --
+   cpu_exec1                       63.1 instructions   8.70 stores, for each guest instruction
+   translate.constprop.0           24.5 instructions   2.31 stores, for each guest instruction
+   translate.constprop.1           18.1 instructions   1.85 stores, for each guest instruction
+   __GE_helper32                   13.7 instructions   1.85 stores, for each guest instruction
+   load32                          11.1 instructions   0.00 stores, for each guest instruction
+   store32                          5.2 instructions   0.31 stores, for each guest instruction
+   fetch32                          2.9 instructions   0.39 stores, for each guest instruction
+   get_CF.part.0                    1.5 instructions   0.08 stores, for each guest instruction
+
+-- translation cache miss every time: where the host instructions and stores were --
+   cpu_exec1                       66.0 instructions  10.39 stores, for each guest instruction
+   __GE_helper32                   36.2 instructions   5.57 stores, for each guest instruction
+   translate.constprop.0           28.7 instructions   4.78 stores, for each guest instruction
+   tlb_refill                      25.5 instructions   2.39 stores, for each guest instruction
+   fetch32                         22.7 instructions   2.99 stores, for each guest instruction
+   load32                           9.6 instructions   0.00 stores, for each guest instruction
+   get_CF.part.0                    3.8 instructions   0.20 stores, for each guest instruction
+   fetch8                           2.8 instructions   0.60 stores, for each guest instruction
